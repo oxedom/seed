@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>seed — a page that grows itself</title>
+<title>seed · a self modifying webpage</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,9 +61,9 @@
 <div id="control-modal" class="fixed z-[9999] w-64 bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a] font-mono">
   <div id="cm-header" class="flex items-center justify-between bg-ink text-paper px-2 py-1.5 cursor-move select-none touch-none">
     <span class="text-[10px] uppercase tracking-widest">seed · control</span>
-    <button id="cm-toggle" class="text-paper text-sm leading-none px-1 hover:opacity-70" title="collapse">–</button>
+    <button id="cm-toggle" class="text-paper text-sm leading-none px-1 hover:opacity-70" title="expand">+</button>
   </div>
-  <div id="cm-body" class="p-2 space-y-2">
+  <div id="cm-body" class="hidden p-2 space-y-2">
     <textarea id="cm-prompt" rows="3" placeholder="describe a new page… (⏎ to generate)"
       class="w-full bg-white border border-ink px-2 py-1 text-[11px] text-ink placeholder:text-stone-400 focus:outline-none resize-none"></textarea>
     <button id="cm-generate"
@@ -413,6 +413,7 @@ Begin your output with the opening tag now.`;
   let config = loadConfig();
   let lastPrompt = localStorage.getItem(LS_LAST_PROMPT) || '';
   let currentAbort = null;
+  let autoOpened = false; // control modal auto-expands once, on first generation
 
   // ==========================================================================
   // SETTINGS MODAL
@@ -563,6 +564,7 @@ Begin your output with the opening tag now.`;
       injectAndExecute(html);
       try { writeStateToUrl(await encodeState(html)); }
       catch (err) { console.warn('seed: failed to encode state to url —', err); }
+      if (!autoOpened) { autoOpened = true; expandModal(); }
     } catch (e) {
       if (e.name === 'AbortError') return;
       injectAndExecute(`
@@ -594,9 +596,8 @@ Begin your output with the opening tag now.`;
       <main class="min-h-screen flex items-center justify-center p-6">
         <div class="max-w-2xl w-full">
           <div class="mb-10">
-            <p class="font-mono text-[11px] uppercase tracking-[0.3em] text-stone-500 mb-4">seed · a generative canvas</p>
-            <h1 class="font-mono font-bold text-6xl sm:text-7xl text-ink leading-none mb-3 tracking-tight">seed<span class="inline-block w-4 h-4 sm:w-5 sm:h-5 bg-ink ml-1 align-baseline"></span></h1>
-            <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-stone-500">a page that grows itself from a single line</p>
+            <p class="font-mono text-[11px] uppercase tracking-[0.3em] text-stone-500 mb-4">seed · a self modifying webpage</p>
+            <h1 class="font-mono font-bold text-6xl sm:text-7xl text-ink leading-none tracking-tight">seed<span class="text-ink">.</span></h1>
           </div>
 
           <div class="bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a]">
@@ -612,31 +613,22 @@ Begin your output with the opening tag now.`;
           </div>
 
           <div class="mt-5 flex flex-wrap gap-2">
-            <button data-preset="Design the perfect prompt interface for a generative web canvas where users type a description and the page rebuilds itself into whatever they describe. Make it beautiful, characterful, minimalist black and white with square boxes and monospace type. Include 3-4 interesting preset prompt buttons that themselves call window.regenerate."
-              class="preset-btn">▣ self-portrait</button>
-            <button data-preset="Build a haiku composer: textarea where I type, and live syllable counters for each of the three lines (5-7-5). Beautiful typography, restrained palette."
-              class="preset-btn">haiku composer</button>
-            <button data-preset="Create a small interactive solar system. Realistic-ish orbits, animated, with a slider to speed up or slow down time. Dark space background with subtle stars."
+            <button data-preset="Design the definitive prompt interface for seed, a self-modifying webpage where a single line of text rebuilds the entire page into whatever the visitor describes. Commit hard to a refined minimalist black-and-white aesthetic: square boxes, hairline ink borders, JetBrains Mono everywhere, generous whitespace, a single chunky offset drop-shadow on the main card. Center a large prompt textarea wired to window.regenerate, with an enter-to-submit hint. Below it, include 4 characterful preset buttons that each call window.regenerate with their own long, detailed, opinionated prompt. Add a tasteful one-line manifesto about a page that rewrites itself. Make it feel like a precise design tool, not an AI demo."
+              class="preset-btn">self-portrait</button>
+            <button data-preset="Build a vibrant Pokemon-themed fan website for a fictional starter region. Big bold hero with a region name and tagline, a responsive grid of at least 8 collectible Pokemon cards (made-up creatures) each with a name, two color-coded type badges, an HP bar, a flavor-text description, and a simple stat block (ATK / DEF / SPD) drawn as little bars. Use a bright, energetic palette inspired by the games (red, blue, yellow, white), rounded card corners, chunky drop shadows, and a clean game-UI feel. Add a type-filter row of buttons that hides and shows cards by type using inline script. Playful, polished, and fully interactive."
+              class="preset-btn">pokédex</button>
+            <button data-preset="Build a fully playable tic-tac-toe drenched in maximalist 1996 GeoCities / Windows 95 web nostalgia. Beveled gray 3D buttons and borders, a tiled starfield or checkered background, a scrolling marquee banner, a fake hit-counter that says you are visitor number 000142, an 'under construction' gif vibe (recreate with CSS, no external images), garish rainbow WordArt-style heading, and Comic-Sans-energy fonts. The game itself must actually work: play against a minimax AI that never loses, track wins/losses/draws, highlight the winning line, and have a reset button. Lean all the way into the cheesy retro vibe while the gameplay stays solid."
+              class="preset-btn">tic-tac-toe '96</button>
+            <button data-preset="Create an interactive solar system simulation. Render the sun and the planets with believable relative sizes and animated elliptical-ish orbits using CSS animations or canvas. Dark deep-space background with a subtle parallax starfield. Include a time-speed slider that smoothly speeds up and slows down all orbital motion, a pause button, and clickable planets that pop up a small info panel with fun facts. Smooth, hypnotic, and elegant."
               class="preset-btn">solar system</button>
-            <button data-preset="Make a brutalist landing page for a fictional 1970s synthesizer company. Heavy serif type, asymmetric grid, technical specs in tables."
-              class="preset-btn">brutalist landing</button>
-            <button data-preset="Build a working tic-tac-toe vs a minimax AI opponent. Score tracking, reset button, win highlight animation."
-              class="preset-btn">tic-tac-toe</button>
+            <button data-preset="Build a focused haiku composer. A large central editor with three lines, and live per-line syllable counters showing the target 5 / 7 / 5 that turn from gray to ink-filled when a line hits its count, with a gentle satisfying state when all three are correct. Beautiful restrained typography, lots of negative space, a thin ink rule between lines, and a tiny rotating writing prompt for inspiration. Calm, literary, and precise."
+              class="preset-btn">haiku</button>
           </div>
 
-          <details class="mt-10 group">
-            <summary class="font-mono text-[10px] uppercase tracking-wider text-stone-400 hover:text-ink select-none">
-              <span class="group-open:hidden">▸ how this works</span>
-              <span class="hidden group-open:inline">▾ how this works</span>
-            </summary>
-            <div class="mt-3 text-xs leading-relaxed text-stone-600 space-y-2 font-mono">
-              <p>• your prompt goes to a configurable llm provider (claude or any openai-compatible endpoint — ollama, lm studio, llama.cpp, vllm, openrouter…)</p>
-              <p>• the model returns raw html which replaces #stage. tailwind utilities and inline &lt;script&gt; tags work.</p>
-              <p>• generated pages can call <code class="bg-stone-100 border border-stone-300 px-1">window.regenerate(prompt)</code> to trigger the next generation — pages can reproduce themselves.</p>
-              <p>• the floating config + reset pill in the top-right always survives. that's your lifeline.</p>
-              <p>• click config to switch providers or set a local model.</p>
-            </div>
-          </details>
+          <button id="bp-explain" type="button"
+            class="mt-10 block text-left font-mono text-[10px] uppercase tracking-wider text-stone-400 hover:text-ink select-none">
+            ▸ how this works — generate an explainer of this codebase
+          </button>
         </div>
       </main>
       <style>
@@ -668,6 +660,15 @@ Begin your output with the opening tag now.`;
         regenerate(ta.value);
       }
     });
+    // "how this works": inject a self-documenting prompt into the textarea, then generate.
+    const explainBtn = document.getElementById('bp-explain');
+    if (explainBtn) {
+      explainBtn.onclick = () => {
+        const p = 'Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAICompatProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.';
+        ta.value = p;
+        regenerate(p);
+      };
+    }
     ta.focus();
   }
   window.renderBootstrap = renderBootstrap;
@@ -738,11 +739,15 @@ Begin your output with the opening tag now.`;
   });
   window.addEventListener('resize', () => setPos(cm.offsetLeft, cm.offsetTop));
 
-  $('cm-toggle').onclick = () => {
-    const collapsed = $('cm-body').classList.toggle('hidden');
-    $('cm-toggle').textContent = collapsed ? '+' : '–';
+  function setCollapsed(collapsed) {
+    $('cm-body').classList.toggle('hidden', collapsed);
+    const t = $('cm-toggle');
+    t.textContent = collapsed ? '+' : '–';
+    t.title = collapsed ? 'expand' : 'collapse';
     setPos(cm.offsetLeft, cm.offsetTop); // re-clamp after height change
-  };
+  }
+  function expandModal() { setCollapsed(false); }
+  $('cm-toggle').onclick = () => setCollapsed(!$('cm-body').classList.contains('hidden'));
 
   restorePos();
 

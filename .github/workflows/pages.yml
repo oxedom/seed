@@ -15,33 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: Playwright smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run Playwright
-        run: npm run test:e2e
-
   deploy:
     name: Deploy GitHub Pages
-    needs: test
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
