@@ -1,0 +1,15 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: seed · a self modifying webpage
+      - heading "seed." [level=1] [ref=e7]
+    - generic [ref=e8]:
+      - textbox "describe what this page should become…" [active] [ref=e9]
+      - button "generate →" [ref=e11] [cursor=pointer]
+    - generic [ref=e12]:
+      - button "self-portrait" [ref=e13] [cursor=pointer]
+      - button "pokédex" [ref=e14] [cursor=pointer]
+      - button "tic-tac-toe '96" [ref=e15] [cursor=pointer]
+      - button "solar system" [ref=e16] [cursor=pointer]
+      - button "haiku" [ref=e17] [cursor=pointer]
+    - button "▸ how this works" [ref=e18] [cursor=pointer]

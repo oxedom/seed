@@ -58,12 +58,12 @@
 <body class="font-mono antialiased">
 
 <!-- Control modal: ALWAYS present, outside #stage, draggable. Lifeline to regenerate/config/reset. -->
-<div id="control-modal" class="fixed z-[9999] w-64 bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a] font-mono">
+<div id="control-modal" class="hidden fixed z-[9999] w-64 bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a] font-mono">
   <div id="cm-header" class="flex items-center justify-between bg-ink text-paper px-2 py-1.5 cursor-move select-none touch-none">
     <span class="text-[10px] uppercase tracking-widest">seed · control</span>
     <button id="cm-toggle" class="text-paper text-sm leading-none px-1 hover:opacity-70" title="expand">+</button>
   </div>
-  <div id="cm-body" class="hidden p-2 space-y-2">
+  <div id="cm-body" class="p-2 space-y-2">
     <textarea id="cm-prompt" rows="3" placeholder="describe a new page… (⏎ to generate)"
       class="w-full bg-white border border-ink px-2 py-1 text-[11px] text-ink placeholder:text-stone-400 focus:outline-none resize-none"></textarea>
     <button id="cm-generate"
@@ -413,7 +413,6 @@ Begin your output with the opening tag now.`;
   let config = loadConfig();
   let lastPrompt = localStorage.getItem(LS_LAST_PROMPT) || '';
   let currentAbort = null;
-  let autoOpened = false; // control modal auto-expands once, on first generation
 
   // ==========================================================================
   // SETTINGS MODAL
@@ -564,7 +563,7 @@ Begin your output with the opening tag now.`;
       injectAndExecute(html);
       try { writeStateToUrl(await encodeState(html)); }
       catch (err) { console.warn('seed: failed to encode state to url —', err); }
-      if (!autoOpened) { autoOpened = true; expandModal(); }
+      revealControlModal();
     } catch (e) {
       if (e.name === 'AbortError') return;
       injectAndExecute(`
@@ -592,6 +591,7 @@ Begin your output with the opening tag now.`;
 
   function renderBootstrap() {
     clearStateFromUrl();
+    hideControlModal();
     stage.innerHTML = `
       <main class="min-h-screen flex items-center justify-center p-6">
         <div class="max-w-2xl w-full">
@@ -627,7 +627,7 @@ Begin your output with the opening tag now.`;
 
           <button id="bp-explain" type="button"
             class="mt-10 block text-left font-mono text-[10px] uppercase tracking-wider text-stone-400 hover:text-ink select-none">
-            ▸ how this works — generate an explainer of this codebase
+            ▸ how this works
           </button>
         </div>
       </main>
@@ -651,7 +651,7 @@ Begin your output with the opening tag now.`;
     `;
     // Wire presets + enter-to-submit
     document.querySelectorAll('.preset-btn').forEach(b => {
-      b.onclick = () => regenerate(b.dataset.preset);
+      b.onclick = () => { ta.value = b.dataset.preset; ta.focus(); };
     });
     const ta = document.getElementById('bp-prompt');
     ta.addEventListener('keydown', e => {
@@ -660,13 +660,13 @@ Begin your output with the opening tag now.`;
         regenerate(ta.value);
       }
     });
-    // "how this works": inject a self-documenting prompt into the textarea, then generate.
+    // "how this works": inject a self-documenting prompt into the textarea; the user presses generate.
     const explainBtn = document.getElementById('bp-explain');
     if (explainBtn) {
       explainBtn.onclick = () => {
         const p = 'Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAICompatProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.';
         ta.value = p;
-        regenerate(p);
+        ta.focus();
       };
     }
     ta.focus();
@@ -746,10 +746,22 @@ Begin your output with the opening tag now.`;
     t.title = collapsed ? 'expand' : 'collapse';
     setPos(cm.offsetLeft, cm.offsetTop); // re-clamp after height change
   }
-  function expandModal() { setCollapsed(false); }
   $('cm-toggle').onclick = () => setCollapsed(!$('cm-body').classList.contains('hidden'));
 
-  restorePos();
+  // The widget stays hidden on the bootstrap screen and appears once there is
+  // generated/restored content on the stage.
+  let cmPositioned = false;
+  function revealControlModal() {
+    const firstTime = cm.classList.contains('hidden');
+    cm.classList.remove('hidden');
+    if (firstTime) {
+      if (!cmPositioned) { restorePos(); cmPositioned = true; } // position now that it has a size
+      setCollapsed(false); // appear expanded the first time
+    }
+  }
+  function hideControlModal() { cm.classList.add('hidden'); }
+  window.__seedRevealControlModal = revealControlModal;
+  window.__seedHideControlModal = hideControlModal;
 
   // ==========================================================================
   // INITIAL RENDER
@@ -760,6 +772,7 @@ Begin your output with the opening tag now.`;
     if (s) {
       try {
         injectAndExecute(await decodeState(s));
+        revealControlModal();
         return;
       } catch (e) {
         console.warn('seed: failed to restore from url —', e);
