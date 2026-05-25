@@ -419,11 +419,11 @@ Begin your output with the opening tag now.`;
     const dot = document.getElementById('status-dot');
     if (!dot) return;
     if (amber) {
-      dot.style.background = '#d97706';
+      dot.style.backgroundColor = '#d97706';
       dot.classList.remove('dot-pulse');
       return;
     }
-    dot.style.background = ok ? '#22c55e' : '#ef4444';
+    dot.style.backgroundColor = ok ? '#22c55e' : '#ef4444';
     dot.classList.toggle('dot-pulse', !ok);
   }
 
@@ -640,7 +640,7 @@ Begin your output with the opening tag now.`;
               placeholder="describe what this page should become…"></textarea>
             <div class="border-t border-ink px-3 py-2 flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <span id="status-dot" style="border-radius:50%;flex-shrink:0" class="inline-block w-2 h-2 bg-stone-300" title="provider status"></span>
+                <span id="status-dot" style="border-radius:50%;flex-shrink:0;background-color:#ef4444" class="inline-block w-2 h-2 dot-pulse" title="provider status"></span>
                 <button id="bp-config-btn" class="text-[10px] font-mono uppercase tracking-wider text-stone-400 hover:text-ink transition">config</button>
               </div>
               <button onclick="window.regenerate(document.getElementById('bp-prompt').value)"
