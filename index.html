@@ -52,6 +52,11 @@
   details > summary { cursor: pointer; list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
   * { border-radius: 0 !important; }
+  @keyframes statusPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.25; transform: scale(0.7); }
+  }
+  .dot-pulse { animation: statusPulse 5s ease-in-out infinite; }
 </style>
 </head>
 
@@ -410,22 +415,32 @@ Begin your output with the opening tag now.`;
     localStorage.setItem(LS_KEY, JSON.stringify(c));
   }
 
-  function updateStatusDot() {
+  function updateStatusDot(ok, amber) {
     const dot = document.getElementById('status-dot');
     if (!dot) return;
+    if (amber) {
+      dot.style.background = '#d97706';
+      dot.classList.remove('dot-pulse');
+      return;
+    }
+    dot.style.background = ok ? '#22c55e' : '#ef4444';
+    dot.classList.toggle('dot-pulse', !ok);
+  }
+
+  function refreshStatusDot() {
     const cfg = loadConfig();
     if (cfg.kind === 'local') {
-      if (!('LanguageModel' in self)) { dot.style.background = '#ef4444'; return; }
-      dot.style.background = '#d97706'; // amber while checking
+      if (!('LanguageModel' in self)) { updateStatusDot(false); return; }
+      updateStatusDot(true, true); // amber while checking
       LanguageModel.availability()
-        .then(a => { dot.style.background = (a === 'available' || a === 'readily') ? '#22c55e' : '#ef4444'; })
-        .catch(() => { dot.style.background = '#ef4444'; });
+        .then(a => updateStatusDot(a === 'available' || a === 'readily'))
+        .catch(() => updateStatusDot(false));
       return;
     }
     const ok = cfg.kind === 'anthropic'
       ? !!cfg.anthropic.apiKey
       : !!(cfg.openaiCompat.baseUrl && cfg.openaiCompat.model);
-    dot.style.background = ok ? '#22c55e' : '#ef4444';
+    updateStatusDot(ok);
   }
 
   let config = loadConfig();
@@ -512,7 +527,7 @@ Begin your output with the opening tag now.`;
     config = readSettingsUI();
     saveConfig(config);
     modal.classList.add('hidden');
-    updateStatusDot();
+    refreshStatusDot();
   };
 
   // ==========================================================================
@@ -709,7 +724,7 @@ Begin your output with the opening tag now.`;
       if (config.kind === 'local') refreshLocalStatus();
     };
 
-    updateStatusDot();
+    refreshStatusDot();
     resizeTa();
     ta.focus();
   }
