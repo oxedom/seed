@@ -74,6 +74,7 @@
         <select id="provider-kind" class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
           <option value="anthropic">anthropic (claude)</option>
           <option value="openai-compat">openai-compatible (ollama, lm studio, llama.cpp, vllm, openrouter, …)</option>
+          <option value="local">local · chrome built-in (gemini nano)</option>
         </select>
       </div>
 
@@ -114,6 +115,20 @@
         <div class="text-[10px] text-stone-500 bg-stone-100 border border-stone-200 p-2 leading-relaxed">
           <strong class="text-terracotta">CORS:</strong> local servers must allow browser origins. For ollama:
           <code class="bg-white px-1">OLLAMA_ORIGINS='*' ollama serve</code>. LM Studio enables CORS in the server tab.
+        </div>
+      </div>
+
+      <!-- Local on-device fields -->
+      <div data-when="local" class="space-y-3 hidden">
+        <p class="text-xs text-stone-600 leading-relaxed">
+          Uses Chrome's built-in <code class="bg-stone-100 px-1">window.LanguageModel</code> API (Gemini Nano, runs entirely on-device). No API key, no network calls.
+        </p>
+        <div id="local-status" class="text-xs font-mono p-2 bg-stone-100 border border-stone-200 text-stone-600">checking availability…</div>
+        <div class="text-[10px] text-stone-500 leading-relaxed">
+          <strong class="text-terracotta">Setup:</strong> Chrome 127+ with the flag <code class="bg-stone-100 px-1">chrome://flags/#prompt-api-for-gemini-nano</code> enabled. The model downloads (~1–2 GB) on first use.
+        </div>
+        <div class="text-[10px] text-stone-500 leading-relaxed">
+          <strong>Note:</strong> Gemini Nano is small and may struggle to produce well-formed HTML for complex prompts. Best results on short, focused requests.
         </div>
       </div>
 
@@ -232,10 +247,37 @@
     }
   }
 
+  class LocalLanguageModelProvider extends LLMProvider {
+    get label() { return 'local · gemini nano (on-device)'; }
+    async generate({ systemPrompt, userPrompt, signal, onProgress }) {
+      if (!('LanguageModel' in self)) {
+        throw new Error('chrome built-in LanguageModel API not available. requires chrome 127+ with chrome://flags/#prompt-api-for-gemini-nano enabled');
+      }
+      const availability = await LanguageModel.availability();
+      if (availability === 'unavailable') {
+        throw new Error('local model unavailable on this device');
+      }
+      const session = await LanguageModel.create({
+        initialPrompts: [{ role: 'system', content: systemPrompt }],
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            if (onProgress) onProgress(`downloading model · ${(e.loaded * 100).toFixed(1)}%`);
+          });
+        },
+      });
+      try {
+        return await session.prompt(userPrompt, { signal });
+      } finally {
+        try { session.destroy(); } catch {}
+      }
+    }
+  }
+
   function makeProvider(cfg) {
     switch (cfg.kind) {
       case 'anthropic':     return new AnthropicProvider(cfg);
       case 'openai-compat': return new OpenAICompatProvider(cfg);
+      case 'local':         return new LocalLanguageModelProvider();
       default: throw new Error(`unknown provider kind: ${cfg.kind}`);
     }
   }
@@ -332,13 +374,47 @@ Begin your output with the opening tag now.`;
     };
   }
 
-  $('settings-btn').onclick = () => { syncSettingsUI(); modal.classList.remove('hidden'); };
+  async function refreshLocalStatus() {
+    const el = $('local-status');
+    if (!el) return;
+    if (!('LanguageModel' in self)) {
+      el.textContent = '✗ not available in this browser — enable chrome://flags/#prompt-api-for-gemini-nano';
+      el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+      return;
+    }
+    el.textContent = 'checking availability…';
+    el.className = 'text-xs font-mono p-2 bg-stone-100 border border-stone-200 text-stone-600';
+    try {
+      const a = await LanguageModel.availability();
+      if (a === 'unavailable') {
+        el.textContent = '✗ unavailable on this device';
+        el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+      } else if (a === 'available' || a === 'readily') {
+        el.textContent = '✓ available — ready';
+        el.className = 'text-xs font-mono p-2 bg-green-50 border border-green-200 text-green-700';
+      } else {
+        el.textContent = `↓ ${a} — model will download on first use`;
+        el.className = 'text-xs font-mono p-2 bg-amber-50 border border-amber-200 text-amber-700';
+      }
+    } catch (e) {
+      el.textContent = `error: ${e.message}`;
+      el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+    }
+  }
+
+  $('settings-btn').onclick = () => {
+    syncSettingsUI();
+    modal.classList.remove('hidden');
+    if (config.kind === 'local') refreshLocalStatus();
+  };
   $('settings-close').onclick = () => modal.classList.add('hidden');
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
   $('provider-kind').addEventListener('change', () => {
+    const kind = $('provider-kind').value;
     document.querySelectorAll('[data-when]').forEach(el => {
-      el.classList.toggle('hidden', el.dataset.when !== $('provider-kind').value);
+      el.classList.toggle('hidden', el.dataset.when !== kind);
     });
+    if (kind === 'local') refreshLocalStatus();
   });
   $('settings-save').onclick = () => {
     config = readSettingsUI();
@@ -357,6 +433,9 @@ Begin your output with the opening tag now.`;
   function buildProvider() {
     if (config.kind === 'anthropic') {
       return makeProvider({ kind: 'anthropic', ...config.anthropic });
+    }
+    if (config.kind === 'local') {
+      return makeProvider({ kind: 'local' });
     }
     return makeProvider({ kind: 'openai-compat', ...config.openaiCompat });
   }
@@ -401,6 +480,7 @@ Begin your output with the opening tag now.`;
         userPrompt: prompt,
         maxTokens: 8000,
         signal: currentAbort.signal,
+        onProgress: (msg) => { loadingLabel.textContent = msg; },
       });
       const html = stripFences(raw);
       if (!html || !html.startsWith('<')) {
