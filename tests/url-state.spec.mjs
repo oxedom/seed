@@ -55,7 +55,7 @@ test('generating writes ?s= and the result survives reload offline', async ({ pa
   await page.reload();
 
   await page.fill('#bp-prompt', 'make a thing');
-  await page.click('text=generate →');
+  await page.locator('#stage button', { hasText: 'generate' }).click();
   await expect(page.locator('#gen')).toHaveText('GENERATED OK');
 
   const s = await page.evaluate(() => new URL(location.href).searchParams.get('s'));

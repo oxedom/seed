@@ -57,14 +57,23 @@
 
 <body class="font-mono antialiased">
 
-<!-- Bootstrap pill: ALWAYS visible, outside #stage. Lifeline back to settings + reset. -->
-<div id="bootstrap-pill" class="fixed top-4 right-4 z-[9999] flex gap-2">
-  <button id="settings-btn"
-    class="bg-ink text-paper border border-ink px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition"
-    title="provider settings">config</button>
-  <button id="reset-btn"
-    class="bg-white border border-ink text-ink px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider hover:bg-ink hover:text-paper transition"
-    title="reset to bootstrap UI">reset</button>
+<!-- Control modal: ALWAYS present, outside #stage, draggable. Lifeline to regenerate/config/reset. -->
+<div id="control-modal" class="fixed z-[9999] w-64 bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a] font-mono">
+  <div id="cm-header" class="flex items-center justify-between bg-ink text-paper px-2 py-1.5 cursor-move select-none touch-none">
+    <span class="text-[10px] uppercase tracking-widest">seed · control</span>
+    <button id="cm-toggle" class="text-paper text-sm leading-none px-1 hover:opacity-70" title="collapse">–</button>
+  </div>
+  <div id="cm-body" class="p-2 space-y-2">
+    <textarea id="cm-prompt" rows="3" placeholder="describe a new page… (⏎ to generate)"
+      class="w-full bg-white border border-ink px-2 py-1 text-[11px] text-ink placeholder:text-stone-400 focus:outline-none resize-none"></textarea>
+    <button id="cm-generate"
+      class="w-full bg-ink text-paper border border-ink px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-white hover:text-ink transition">generate →</button>
+    <div class="grid grid-cols-3 gap-1">
+      <button id="cm-copy" class="border border-ink px-1 py-1 text-[9px] uppercase tracking-wider hover:bg-ink hover:text-paper transition" title="copy share url">copy url</button>
+      <button id="cm-config" class="border border-ink px-1 py-1 text-[9px] uppercase tracking-wider hover:bg-ink hover:text-paper transition" title="provider settings">config</button>
+      <button id="cm-reset" class="border border-ink px-1 py-1 text-[9px] uppercase tracking-wider hover:bg-ink hover:text-paper transition" title="reset to bootstrap">reset</button>
+    </div>
+  </div>
 </div>
 
 <!-- Settings modal -->
@@ -358,7 +367,7 @@ ENVIRONMENT:
 - Fonts available: 'JetBrains Mono' (mono, the house font), system-ui (sans).
 - Your output is injected via innerHTML, THEN any <script> tags you include ARE re-executed (the host page rewires them).
 - You have full access to window, document, fetch, and all browser APIs from within your <script> tags.
-- A small floating "config" + "reset" pill exists in the top-right corner outside #stage — do NOT try to remove it. Leave room (~80px) at the top-right so it doesn't overlap your design.
+- A draggable "seed · control" panel (~260px wide, default top-right, outside #stage) floats above the page — do NOT try to remove it. Leave room near its default top-right position so it doesn't overlap critical content.
 
 HOST API (available in your scripts):
 - window.regenerate(prompt: string) — triggers a NEW generation that REPLACES the stage. Use this to make pages that include their own "generate again" prompts, remix buttons, or forms.
@@ -467,7 +476,7 @@ Begin your output with the opening tag now.`;
     }
   }
 
-  $('settings-btn').onclick = () => {
+  $('cm-config').onclick = () => {
     syncSettingsUI();
     modal.classList.remove('hidden');
     if (config.kind === 'local') refreshLocalStatus();
@@ -663,10 +672,79 @@ Begin your output with the opening tag now.`;
   }
   window.renderBootstrap = renderBootstrap;
 
-  $('reset-btn').onclick = () => {
+  // ---- Control modal: reset, regenerate, copy, drag, collapse ----------------
+  $('cm-reset').onclick = () => {
     if (currentAbort) currentAbort.abort();
     renderBootstrap();
   };
+  $('cm-generate').onclick = () => regenerate($('cm-prompt').value);
+  $('cm-prompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); regenerate($('cm-prompt').value); }
+  });
+  $('cm-copy').onclick = async () => {
+    const btn = $('cm-copy'), original = btn.textContent, url = location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = url.length > 100000 ? 'big url' : 'copied';
+    } catch { btn.textContent = 'blocked'; }
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  };
+
+  const cm = $('control-modal');
+  const cmHeader = $('cm-header');
+  const MODAL_POS_KEY = 'seed_modal_pos_v1';
+
+  function clampPos(left, top) {
+    const maxLeft = Math.max(0, window.innerWidth - cm.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - cm.offsetHeight);
+    return {
+      left: Math.min(Math.max(0, left), maxLeft),
+      top: Math.min(Math.max(0, top), maxTop),
+    };
+  }
+  function setPos(left, top) {
+    const p = clampPos(left, top);
+    cm.style.left = p.left + 'px';
+    cm.style.top = p.top + 'px';
+    cm.style.right = 'auto';
+  }
+  function savePos() {
+    localStorage.setItem(MODAL_POS_KEY, JSON.stringify({ left: cm.offsetLeft, top: cm.offsetTop }));
+  }
+  function restorePos() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(MODAL_POS_KEY));
+      if (saved && typeof saved.left === 'number') { setPos(saved.left, saved.top); return; }
+    } catch {}
+    setPos(window.innerWidth - cm.offsetWidth - 16, 16); // default: top-right
+  }
+
+  let dragging = false, dragDX = 0, dragDY = 0;
+  cmHeader.addEventListener('pointerdown', e => {
+    if (e.target.closest('#cm-toggle')) return; // don't drag when toggling
+    dragging = true;
+    dragDX = e.clientX - cm.offsetLeft;
+    dragDY = e.clientY - cm.offsetTop;
+    cmHeader.setPointerCapture(e.pointerId);
+  });
+  cmHeader.addEventListener('pointermove', e => {
+    if (dragging) setPos(e.clientX - dragDX, e.clientY - dragDY);
+  });
+  cmHeader.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    dragging = false;
+    cmHeader.releasePointerCapture(e.pointerId);
+    savePos();
+  });
+  window.addEventListener('resize', () => setPos(cm.offsetLeft, cm.offsetTop));
+
+  $('cm-toggle').onclick = () => {
+    const collapsed = $('cm-body').classList.toggle('hidden');
+    $('cm-toggle').textContent = collapsed ? '+' : '–';
+    setPos(cm.offsetLeft, cm.offsetTop); // re-clamp after height change
+  };
+
+  restorePos();
 
   // ==========================================================================
   // INITIAL RENDER
