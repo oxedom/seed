@@ -410,6 +410,24 @@ Begin your output with the opening tag now.`;
     localStorage.setItem(LS_KEY, JSON.stringify(c));
   }
 
+  function updateStatusDot() {
+    const dot = document.getElementById('status-dot');
+    if (!dot) return;
+    const cfg = loadConfig();
+    if (cfg.kind === 'local') {
+      if (!('LanguageModel' in self)) { dot.style.background = '#ef4444'; return; }
+      dot.style.background = '#d97706'; // amber while checking
+      LanguageModel.availability()
+        .then(a => { dot.style.background = (a === 'available' || a === 'readily') ? '#22c55e' : '#ef4444'; })
+        .catch(() => { dot.style.background = '#ef4444'; });
+      return;
+    }
+    const ok = cfg.kind === 'anthropic'
+      ? !!cfg.anthropic.apiKey
+      : !!(cfg.openaiCompat.baseUrl && cfg.openaiCompat.model);
+    dot.style.background = ok ? '#22c55e' : '#ef4444';
+  }
+
   let config = loadConfig();
   let lastPrompt = localStorage.getItem(LS_LAST_PROMPT) || '';
   let currentAbort = null;
@@ -494,6 +512,7 @@ Begin your output with the opening tag now.`;
     config = readSettingsUI();
     saveConfig(config);
     modal.classList.add('hidden');
+    updateStatusDot();
   };
 
   // ==========================================================================
@@ -601,10 +620,14 @@ Begin your output with the opening tag now.`;
           </div>
 
           <div class="bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a]">
-            <textarea id="bp-prompt" rows="7"
-              class="w-full p-4 font-mono text-xs text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent"
+            <textarea id="bp-prompt" rows="2"
+              class="w-full p-4 font-mono text-xs text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent overflow-y-auto"
               placeholder="describe what this page should become…"></textarea>
             <div class="border-t border-ink px-3 py-2 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span id="status-dot" style="border-radius:50%;flex-shrink:0" class="inline-block w-2 h-2 bg-stone-300" title="provider status"></span>
+                <button id="bp-config-btn" class="text-[10px] font-mono uppercase tracking-wider text-stone-400 hover:text-ink transition">config</button>
+              </div>
               <button onclick="window.regenerate(document.getElementById('bp-prompt').value)"
                 class="bg-ink text-paper border border-ink px-4 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition">
                 generate →
@@ -649,27 +672,45 @@ Begin your output with the opening tag now.`;
         }
       </style>
     `;
-    // Wire presets + enter-to-submit
-    document.querySelectorAll('.preset-btn').forEach(b => {
-      b.onclick = () => { ta.value = b.dataset.preset; ta.scrollTop = 0; ta.focus(); };
-    });
     const ta = document.getElementById('bp-prompt');
+
+    function resizeTa() {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.7) + 'px';
+    }
+    function injectTa(text) {
+      ta.value = text;
+      resizeTa();
+      ta.scrollTop = 0;
+      ta.focus();
+    }
+
+    ta.addEventListener('input', resizeTa);
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         regenerate(ta.value);
       }
     });
-    // "how this works": inject a self-documenting prompt into the textarea; the user presses generate.
+
+    document.querySelectorAll('.preset-btn').forEach(b => {
+      b.onclick = () => injectTa(b.dataset.preset);
+    });
+
     const explainBtn = document.getElementById('bp-explain');
     if (explainBtn) {
-      explainBtn.onclick = () => {
-        const p = 'Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAICompatProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.';
-        ta.value = p;
-        ta.scrollTop = 0;
-        ta.focus();
-      };
+      explainBtn.onclick = () => injectTa('Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAICompatProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.');
     }
+
+    const bpConfigBtn = document.getElementById('bp-config-btn');
+    if (bpConfigBtn) bpConfigBtn.onclick = () => {
+      syncSettingsUI();
+      modal.classList.remove('hidden');
+      if (config.kind === 'local') refreshLocalStatus();
+    };
+
+    updateStatusDot();
+    resizeTa();
     ta.focus();
   }
   window.renderBootstrap = renderBootstrap;
