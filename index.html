@@ -290,6 +290,64 @@
   }
 
   // ==========================================================================
+  // URL STATE CODEC  (html <-> ?s= param, gzip+base64url)
+  // ==========================================================================
+
+  function bytesToBase64url(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function base64urlToBytes(str) {
+    const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  async function gzipBytes(str) {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function gunzipBytes(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  }
+
+  // Format prefix: 'g' = gzip+base64url, 'b' = plain base64url (fallback).
+  async function encodeState(html) {
+    if (typeof CompressionStream === 'function') {
+      return 'g' + bytesToBase64url(await gzipBytes(html));
+    }
+    return 'b' + bytesToBase64url(new TextEncoder().encode(html));
+  }
+  async function decodeState(str) {
+    if (!str) throw new Error('empty state');
+    const fmt = str[0], payload = str.slice(1);
+    const bytes = base64urlToBytes(payload);
+    if (fmt === 'g') return await gunzipBytes(bytes);
+    if (fmt === 'b') return new TextDecoder().decode(bytes);
+    throw new Error('unknown state format: ' + fmt);
+  }
+
+  function readStateFromUrl() {
+    return new URL(location.href).searchParams.get('s');
+  }
+  function writeStateToUrl(stateStr) {
+    const url = new URL(location.href);
+    url.searchParams.set('s', stateStr);
+    history.replaceState(null, '', url);
+  }
+  function clearStateFromUrl() {
+    const url = new URL(location.href);
+    url.searchParams.delete('s');
+    history.replaceState(null, '', url);
+  }
+
+  // Test/debug hook.
+  window.__seed = { encodeState, decodeState, readStateFromUrl, writeStateToUrl, clearStateFromUrl };
+
+  // ==========================================================================
   // SYSTEM PROMPT for self-generation
   // ==========================================================================
 
@@ -494,6 +552,8 @@ Begin your output with the opening tag now.`;
         throw new Error('model did not return HTML. raw: ' + raw.slice(0, 200));
       }
       injectAndExecute(html);
+      try { writeStateToUrl(await encodeState(html)); }
+      catch (err) { console.warn('seed: failed to encode state to url —', err); }
     } catch (e) {
       if (e.name === 'AbortError') return;
       injectAndExecute(`
@@ -520,6 +580,7 @@ Begin your output with the opening tag now.`;
   // ==========================================================================
 
   function renderBootstrap() {
+    clearStateFromUrl();
     stage.innerHTML = `
       <main class="min-h-screen flex items-center justify-center p-6">
         <div class="max-w-2xl w-full">
@@ -534,7 +595,6 @@ Begin your output with the opening tag now.`;
               class="w-full p-4 font-mono text-base text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent"
               placeholder="describe what this page should become…"></textarea>
             <div class="border-t border-ink px-3 py-2 flex items-center justify-between gap-2">
-              <span class="font-mono text-[10px] uppercase tracking-wider text-stone-400">⏎ to generate · ⇧⏎ for newline</span>
               <button onclick="window.regenerate(document.getElementById('bp-prompt').value)"
                 class="bg-ink text-paper border border-ink px-4 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition">
                 generate →
@@ -612,7 +672,20 @@ Begin your output with the opening tag now.`;
   // INITIAL RENDER
   // ==========================================================================
 
-  renderBootstrap();
+  async function restoreOrBootstrap() {
+    const s = readStateFromUrl();
+    if (s) {
+      try {
+        injectAndExecute(await decodeState(s));
+        return;
+      } catch (e) {
+        console.warn('seed: failed to restore from url —', e);
+        // fall through to bootstrap (renderBootstrap clears the bad param)
+      }
+    }
+    renderBootstrap();
+  }
+  restoreOrBootstrap();
 </script>
 
 </body>
