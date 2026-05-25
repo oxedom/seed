@@ -3,75 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tabula — a page that rebuilds itself</title>
+<title>seed — a page that grows itself</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 
 <script>
   tailwind.config = {
     theme: {
       extend: {
         fontFamily: {
-          serif: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+          sans: ['JetBrains Mono', 'ui-monospace', 'monospace'],
           mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
         },
         colors: {
-          cream: '#faf7f1',
-          ink: '#1a1815',
-          terracotta: '#b04a2f',
-        }
+          paper: '#ffffff',
+          ink: '#0a0a0a',
+        },
+        borderRadius: {
+          none: '0',
+        },
       }
     }
   };
 </script>
 
 <style>
-  body { background: #faf7f1; color: #1a1815; }
-  .stage-enter { animation: stageIn 0.5s ease-out; }
+  body {
+    background-color: #ffffff;
+    background-image: radial-gradient(#d4d4d4 1px, transparent 1px);
+    background-size: 22px 22px;
+    color: #0a0a0a;
+  }
+  .stage-enter { animation: stageIn 0.4s ease-out; }
   @keyframes stageIn {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .pulse-dot {
     animation: pulseDot 1.4s ease-in-out infinite;
   }
   @keyframes pulseDot {
-    0%, 100% { opacity: 0.3; transform: scale(0.9); }
-    50% { opacity: 1; transform: scale(1.1); }
+    0%, 100% { opacity: 0.2; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
   }
-  /* hide bootstrap pill on small mobile so generated content shines */
   details > summary { cursor: pointer; list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
+  * { border-radius: 0 !important; }
 </style>
 </head>
 
-<body class="font-sans antialiased">
+<body class="font-mono antialiased">
 
 <!-- Bootstrap pill: ALWAYS visible, outside #stage. Lifeline back to settings + reset. -->
 <div id="bootstrap-pill" class="fixed top-4 right-4 z-[9999] flex gap-2">
   <button id="settings-btn"
-    class="bg-ink text-cream rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-700 transition shadow-lg"
-    title="provider settings">⚙ config</button>
+    class="bg-ink text-paper border border-ink px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition"
+    title="provider settings">config</button>
   <button id="reset-btn"
-    class="bg-cream border border-stone-300 text-stone-600 rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-100 hover:text-ink transition shadow-sm"
-    title="reset to bootstrap UI">↺ reset</button>
+    class="bg-white border border-ink text-ink px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider hover:bg-ink hover:text-paper transition"
+    title="reset to bootstrap UI">reset</button>
 </div>
 
 <!-- Settings modal -->
-<div id="settings-modal" class="hidden fixed inset-0 z-[10000] bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-cream border border-stone-300 max-w-md w-full p-6 shadow-2xl">
+<div id="settings-modal" class="hidden fixed inset-0 z-[10000] bg-ink/30 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white border border-ink max-w-md w-full p-6 shadow-[8px_8px_0_0_#0a0a0a]">
     <div class="flex items-center justify-between mb-5">
-      <h2 class="font-serif italic text-2xl text-ink">provider config</h2>
+      <h2 class="font-mono font-bold text-lg uppercase tracking-wider text-ink">provider config</h2>
       <button id="settings-close" class="text-stone-400 hover:text-ink text-xl leading-none">×</button>
     </div>
 
     <div class="space-y-4 text-sm">
       <div>
         <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">provider</label>
-        <select id="provider-kind" class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+        <select id="provider-kind" class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
           <option value="anthropic">anthropic (claude)</option>
           <option value="openai-compat">openai-compatible (ollama, lm studio, llama.cpp, vllm, openrouter, …)</option>
           <option value="local">local · chrome built-in (gemini nano)</option>
@@ -83,12 +90,12 @@
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key</label>
           <input id="anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"
-            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
         </div>
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
           <input id="anthropic-model" value="claude-opus-4-7"
-            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
         </div>
       </div>
 
@@ -97,7 +104,7 @@
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">base url</label>
           <input id="oac-base" value="http://localhost:11434/v1"
-            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
           <p class="text-[10px] text-stone-400 mt-1 leading-relaxed">
             ollama: <code>http://localhost:11434/v1</code> · lm studio: <code>http://localhost:1234/v1</code> · llama.cpp: <code>http://localhost:8080/v1</code>
           </p>
@@ -105,27 +112,27 @@
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
           <input id="oac-model" placeholder="e.g. gemma3:4b, llama3.2, qwen2.5-coder:7b"
-            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
         </div>
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key <span class="text-stone-400 normal-case">(optional, leave blank for local)</span></label>
           <input id="oac-key" type="password" autocomplete="off" spellcheck="false"
-            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
         </div>
-        <div class="text-[10px] text-stone-500 bg-stone-100 border border-stone-200 p-2 leading-relaxed">
-          <strong class="text-terracotta">CORS:</strong> local servers must allow browser origins. For ollama:
-          <code class="bg-white px-1">OLLAMA_ORIGINS='*' ollama serve</code>. LM Studio enables CORS in the server tab.
+        <div class="text-[10px] text-stone-600 bg-stone-50 border border-stone-300 p-2 leading-relaxed">
+          <strong class="text-ink">CORS:</strong> local servers must allow browser origins. For ollama:
+          <code class="bg-white border border-stone-300 px-1">OLLAMA_ORIGINS='*' ollama serve</code>. LM Studio enables CORS in the server tab.
         </div>
       </div>
 
       <!-- Local on-device fields -->
       <div data-when="local" class="space-y-3 hidden">
         <p class="text-xs text-stone-600 leading-relaxed">
-          Uses Chrome's built-in <code class="bg-stone-100 px-1">window.LanguageModel</code> API (Gemini Nano, runs entirely on-device). No API key, no network calls.
+          Uses Chrome's built-in <code class="bg-stone-100 border border-stone-300 px-1">window.LanguageModel</code> API (Gemini Nano, runs entirely on-device). No API key, no network calls.
         </p>
-        <div id="local-status" class="text-xs font-mono p-2 bg-stone-100 border border-stone-200 text-stone-600">checking availability…</div>
+        <div id="local-status" class="text-xs font-mono p-2 bg-stone-50 border border-stone-300 text-stone-600">checking availability…</div>
         <div class="text-[10px] text-stone-500 leading-relaxed">
-          <strong class="text-terracotta">Setup:</strong> Chrome 127+ with the flag <code class="bg-stone-100 px-1">chrome://flags/#prompt-api-for-gemini-nano</code> enabled. The model downloads (~1–2 GB) on first use.
+          <strong class="text-ink">Setup:</strong> Chrome 127+ with the flag <code class="bg-stone-100 border border-stone-300 px-1">chrome://flags/#prompt-api-for-gemini-nano</code> enabled. The model downloads (~1–2 GB) on first use.
         </div>
         <div class="text-[10px] text-stone-500 leading-relaxed">
           <strong>Note:</strong> Gemini Nano is small and may struggle to produce well-formed HTML for complex prompts. Best results on short, focused requests.
@@ -134,19 +141,19 @@
 
       <div class="flex justify-end gap-2 pt-2">
         <button id="settings-save"
-          class="bg-terracotta text-cream px-4 py-2 text-sm font-mono uppercase tracking-wider hover:bg-orange-700 transition">save</button>
+          class="bg-ink text-paper border border-ink px-4 py-2 text-sm font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition">save</button>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Loading overlay -->
-<div id="loading" class="hidden fixed inset-0 z-[9998] bg-cream/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+<div id="loading" class="hidden fixed inset-0 z-[9998] bg-white/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
   <div class="text-center">
     <div class="flex gap-1.5 justify-center mb-3">
-      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0s"></div>
-      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0.2s"></div>
-      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0.4s"></div>
+      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0s"></div>
+      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0.2s"></div>
+      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0.4s"></div>
     </div>
     <p class="font-mono text-xs uppercase tracking-widest text-stone-500" id="loading-label">generating…</p>
   </div>
@@ -182,7 +189,7 @@
     }
     get label() { return `anthropic · ${this.model}`; }
     async generate({ systemPrompt, userPrompt, maxTokens = 4096, signal }) {
-      if (!this.apiKey) throw new Error('no anthropic api key set — open ⚙ config');
+      if (!this.apiKey) throw new Error('no anthropic api key set — open config');
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         signal,
@@ -286,11 +293,11 @@
   // SYSTEM PROMPT for self-generation
   // ==========================================================================
 
-  const SYSTEM_PROMPT = `You generate the complete inner HTML for an inline <div id="stage"> element on a page that rebuilds itself.
+  const SYSTEM_PROMPT = `You generate the complete inner HTML for an inline <div id="stage"> element on a page that grows itself from a single line of text.
 
 ENVIRONMENT:
 - Tailwind CSS (Play CDN with MutationObserver) is loaded — every Tailwind utility class works on your output automatically.
-- Fonts available: 'Fraunces' (serif), 'JetBrains Mono' (mono), system-ui (sans).
+- Fonts available: 'JetBrains Mono' (mono, the house font), system-ui (sans).
 - Your output is injected via innerHTML, THEN any <script> tags you include ARE re-executed (the host page rewires them).
 - You have full access to window, document, fetch, and all browser APIs from within your <script> tags.
 - A small floating "config" + "reset" pill exists in the top-right corner outside #stage — do NOT try to remove it. Leave room (~80px) at the top-right so it doesn't overlap your design.
@@ -314,8 +321,8 @@ Begin your output with the opening tag now.`;
   // STATE & PERSISTENCE
   // ==========================================================================
 
-  const LS_KEY = 'tabula_config_v1';
-  const LS_LAST_PROMPT = 'tabula_last_prompt_v1';
+  const LS_KEY = 'seed_config_v1';
+  const LS_LAST_PROMPT = 'seed_last_prompt_v1';
 
   const defaultConfig = {
     kind: 'anthropic',
@@ -379,26 +386,26 @@ Begin your output with the opening tag now.`;
     if (!el) return;
     if (!('LanguageModel' in self)) {
       el.textContent = '✗ not available in this browser — enable chrome://flags/#prompt-api-for-gemini-nano';
-      el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+      el.className = 'text-xs font-mono p-2 bg-stone-100 border border-ink text-ink';
       return;
     }
     el.textContent = 'checking availability…';
-    el.className = 'text-xs font-mono p-2 bg-stone-100 border border-stone-200 text-stone-600';
+    el.className = 'text-xs font-mono p-2 bg-stone-50 border border-stone-300 text-stone-600';
     try {
       const a = await LanguageModel.availability();
       if (a === 'unavailable') {
         el.textContent = '✗ unavailable on this device';
-        el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+        el.className = 'text-xs font-mono p-2 bg-stone-100 border border-ink text-ink';
       } else if (a === 'available' || a === 'readily') {
         el.textContent = '✓ available — ready';
-        el.className = 'text-xs font-mono p-2 bg-green-50 border border-green-200 text-green-700';
+        el.className = 'text-xs font-mono p-2 bg-ink border border-ink text-paper';
       } else {
         el.textContent = `↓ ${a} — model will download on first use`;
-        el.className = 'text-xs font-mono p-2 bg-amber-50 border border-amber-200 text-amber-700';
+        el.className = 'text-xs font-mono p-2 bg-stone-100 border border-ink text-ink';
       }
     } catch (e) {
       el.textContent = `error: ${e.message}`;
-      el.className = 'text-xs font-mono p-2 bg-red-50 border border-red-200 text-red-700';
+      el.className = 'text-xs font-mono p-2 bg-stone-100 border border-ink text-ink';
     }
   }
 
@@ -491,8 +498,8 @@ Begin your output with the opening tag now.`;
       if (e.name === 'AbortError') return;
       injectAndExecute(`
         <div class="min-h-screen flex items-center justify-center p-6">
-          <div class="max-w-lg bg-white border border-terracotta/40 p-6">
-            <p class="font-mono text-xs uppercase tracking-wider text-terracotta mb-2">generation failed</p>
+          <div class="max-w-lg bg-white border border-ink p-6 shadow-[6px_6px_0_0_#0a0a0a]">
+            <p class="font-mono text-xs uppercase tracking-wider text-ink mb-2">generation failed</p>
             <p class="text-sm text-ink mb-4">${e.message.replace(/</g, '&lt;')}</p>
             <button onclick="renderBootstrap()" class="text-xs font-mono uppercase tracking-wider underline text-stone-600 hover:text-ink">back to bootstrap →</button>
           </div>
@@ -517,26 +524,27 @@ Begin your output with the opening tag now.`;
       <main class="min-h-screen flex items-center justify-center p-6">
         <div class="max-w-2xl w-full">
           <div class="mb-10">
-            <h1 class="font-serif italic font-medium text-7xl text-ink leading-none mb-3">tabula<span class="text-terracotta">.</span></h1>
-            <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-stone-500">a page that rebuilds itself from text</p>
+            <p class="font-mono text-[11px] uppercase tracking-[0.3em] text-stone-500 mb-4">seed · a generative canvas</p>
+            <h1 class="font-mono font-bold text-6xl sm:text-7xl text-ink leading-none mb-3 tracking-tight">seed<span class="inline-block w-4 h-4 sm:w-5 sm:h-5 bg-ink ml-1 align-baseline"></span></h1>
+            <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-stone-500">a page that grows itself from a single line</p>
           </div>
 
-          <div class="bg-white border border-stone-300 shadow-sm">
+          <div class="bg-white border border-ink shadow-[6px_6px_0_0_#0a0a0a]">
             <textarea id="bp-prompt" rows="4"
-              class="w-full p-4 font-sans text-base text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent"
+              class="w-full p-4 font-mono text-base text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent"
               placeholder="describe what this page should become…"></textarea>
-            <div class="border-t border-stone-200 px-3 py-2 flex items-center justify-between gap-2">
+            <div class="border-t border-ink px-3 py-2 flex items-center justify-between gap-2">
               <span class="font-mono text-[10px] uppercase tracking-wider text-stone-400">⏎ to generate · ⇧⏎ for newline</span>
               <button onclick="window.regenerate(document.getElementById('bp-prompt').value)"
-                class="bg-ink text-cream px-4 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-700 transition">
+                class="bg-ink text-paper border border-ink px-4 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-white hover:text-ink transition">
                 generate →
               </button>
             </div>
           </div>
 
           <div class="mt-5 flex flex-wrap gap-2">
-            <button data-preset="Design the perfect prompt interface for a generative web canvas where users type a description and the page rebuilds itself into whatever they describe. Make it beautiful, characterful, slightly weird. Include 3-4 interesting preset prompt buttons that themselves call window.regenerate."
-              class="preset-btn">✦ self-portrait</button>
+            <button data-preset="Design the perfect prompt interface for a generative web canvas where users type a description and the page rebuilds itself into whatever they describe. Make it beautiful, characterful, minimalist black and white with square boxes and monospace type. Include 3-4 interesting preset prompt buttons that themselves call window.regenerate."
+              class="preset-btn">▣ self-portrait</button>
             <button data-preset="Build a haiku composer: textarea where I type, and live syllable counters for each of the three lines (5-7-5). Beautiful typography, restrained palette."
               class="preset-btn">haiku composer</button>
             <button data-preset="Create a small interactive solar system. Realistic-ish orbits, animated, with a slider to speed up or slow down time. Dark space background with subtle stars."
@@ -555,9 +563,9 @@ Begin your output with the opening tag now.`;
             <div class="mt-3 text-xs leading-relaxed text-stone-600 space-y-2 font-mono">
               <p>• your prompt goes to a configurable llm provider (claude or any openai-compatible endpoint — ollama, lm studio, llama.cpp, vllm, openrouter…)</p>
               <p>• the model returns raw html which replaces #stage. tailwind utilities and inline &lt;script&gt; tags work.</p>
-              <p>• generated pages can call <code class="text-terracotta">window.regenerate(prompt)</code> to trigger the next generation — pages can reproduce themselves.</p>
-              <p>• the floating ⚙ and ↺ pill in the top-right always survives. that's your lifeline.</p>
-              <p>• click ⚙ config to switch providers or set a local model.</p>
+              <p>• generated pages can call <code class="bg-stone-100 border border-stone-300 px-1">window.regenerate(prompt)</code> to trigger the next generation — pages can reproduce themselves.</p>
+              <p>• the floating config + reset pill in the top-right always survives. that's your lifeline.</p>
+              <p>• click config to switch providers or set a local model.</p>
             </div>
           </details>
         </div>
@@ -567,17 +575,16 @@ Begin your output with the opening tag now.`;
           font-family: 'JetBrains Mono', monospace;
           font-size: 11px;
           text-transform: lowercase;
-          color: rgb(87 83 78);
+          color: #0a0a0a;
           background: white;
-          border: 1px solid rgb(214 211 209);
+          border: 1px solid #0a0a0a;
           padding: 6px 12px;
-          border-radius: 9999px;
           transition: all 0.1s;
           cursor: pointer;
         }
         .preset-btn:hover {
-          color: #b04a2f;
-          border-color: #b04a2f;
+          color: #ffffff;
+          background: #0a0a0a;
         }
       </style>
     `;
