@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>seed · a self modifying webpage</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -94,6 +95,7 @@
         <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">provider</label>
         <select id="provider-kind" class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
           <option value="anthropic">anthropic (claude)</option>
+          <option value="openai">openai (responses)</option>
           <option value="openai-compat">openai-compatible (ollama, lm studio, llama.cpp, vllm, openrouter, …)</option>
           <option value="local">local · chrome built-in (gemini nano)</option>
         </select>
@@ -108,8 +110,29 @@
         </div>
         <div>
           <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
-          <input id="anthropic-model" value="claude-opus-4-7"
+          <select id="anthropic-model"
             class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6  (sonnet 4.6)</option>
+            <option value="claude-opus-4-7">claude-opus-4-7  (opus 4.7 · most capable)</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001  (haiku 4.5 · fast)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- OpenAI fields -->
+      <div data-when="openai" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key</label>
+          <input id="openai-key" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false"
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
+          <input id="openai-model" placeholder="gpt-5.5"
+            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
+        </div>
+        <div class="text-[10px] text-stone-600 bg-stone-50 border border-stone-300 p-2 leading-relaxed">
+          Uses OpenAI's Responses API directly from this browser. The key is stored in localStorage and sent only with generation requests.
         </div>
       </div>
 
@@ -196,7 +219,7 @@
   }
 
   class AnthropicProvider extends LLMProvider {
-    constructor({ apiKey, model = 'claude-opus-4-7' }) {
+    constructor({ apiKey, model = 'claude-sonnet-4-6' }) {
       super();
       this.apiKey = apiKey;
       this.model = model;
@@ -229,6 +252,50 @@
         .filter(b => b.type === 'text')
         .map(b => b.text)
         .join('');
+    }
+  }
+
+  class OpenAIProvider extends LLMProvider {
+    constructor({ apiKey, model = 'gpt-5.5' }) {
+      super();
+      this.apiKey = apiKey;
+      this.model = model;
+    }
+    get label() { return `openai · ${this.model}`; }
+    async generate({ systemPrompt, userPrompt, maxTokens = 4096, signal }) {
+      if (!this.apiKey) throw new Error('no openai api key set — open config');
+      if (!this.model) throw new Error('no openai model set');
+      const res = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          instructions: systemPrompt,
+          input: userPrompt,
+          max_output_tokens: maxTokens,
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`openai ${res.status}: ${t.slice(0, 400)}`);
+      }
+      const data = await res.json();
+      const text = this.extractText(data);
+      if (!text) throw new Error('openai returned no text');
+      return text;
+    }
+    extractText(data) {
+      if (typeof data.output_text === 'string') return data.output_text;
+      const outputText = (data.output || [])
+        .flatMap(item => item.content || [])
+        .map(part => typeof part.text === 'string' ? part.text : '')
+        .join('');
+      if (outputText) return outputText;
+      return data?.choices?.[0]?.message?.content ?? '';
     }
   }
 
@@ -297,6 +364,7 @@
   function makeProvider(cfg) {
     switch (cfg.kind) {
       case 'anthropic':     return new AnthropicProvider(cfg);
+      case 'openai':        return new OpenAIProvider(cfg);
       case 'openai-compat': return new OpenAICompatProvider(cfg);
       case 'local':         return new LocalLanguageModelProvider();
       default: throw new Error(`unknown provider kind: ${cfg.kind}`);
@@ -398,7 +466,8 @@ Begin your output with the opening tag now.`;
 
   const defaultConfig = {
     kind: 'anthropic',
-    anthropic: { apiKey: '', model: 'claude-opus-4-7' },
+    anthropic: { apiKey: '', model: 'claude-sonnet-4-6' },
+    openai: { apiKey: '', model: 'gpt-5.5' },
     openaiCompat: { baseUrl: 'http://localhost:11434/v1', apiKey: '', model: '' },
   };
 
@@ -437,9 +506,10 @@ Begin your output with the opening tag now.`;
         .catch(() => updateStatusDot(false));
       return;
     }
-    const ok = cfg.kind === 'anthropic'
-      ? !!cfg.anthropic.apiKey
-      : !!(cfg.openaiCompat.baseUrl && cfg.openaiCompat.model);
+    const ok =
+      (cfg.kind === 'anthropic' && !!cfg.anthropic.apiKey) ||
+      (cfg.kind === 'openai' && !!cfg.openai.apiKey && !!cfg.openai.model) ||
+      (cfg.kind === 'openai-compat' && !!(cfg.openaiCompat.baseUrl && cfg.openaiCompat.model));
     updateStatusDot(ok);
   }
 
@@ -458,6 +528,8 @@ Begin your output with the opening tag now.`;
     $('provider-kind').value = config.kind;
     $('anthropic-key').value = config.anthropic.apiKey;
     $('anthropic-model').value = config.anthropic.model;
+    $('openai-key').value = config.openai.apiKey;
+    $('openai-model').value = config.openai.model;
     $('oac-base').value = config.openaiCompat.baseUrl;
     $('oac-key').value = config.openaiCompat.apiKey;
     $('oac-model').value = config.openaiCompat.model;
@@ -471,7 +543,11 @@ Begin your output with the opening tag now.`;
       kind,
       anthropic: {
         apiKey: $('anthropic-key').value.trim(),
-        model: $('anthropic-model').value.trim() || 'claude-opus-4-7',
+        model: $('anthropic-model').value.trim() || 'claude-sonnet-4-6',
+      },
+      openai: {
+        apiKey: $('openai-key').value.trim(),
+        model: $('openai-model').value.trim() || 'gpt-5.5',
       },
       openaiCompat: {
         baseUrl: $('oac-base').value.trim(),
@@ -541,6 +617,9 @@ Begin your output with the opening tag now.`;
   function buildProvider() {
     if (config.kind === 'anthropic') {
       return makeProvider({ kind: 'anthropic', ...config.anthropic });
+    }
+    if (config.kind === 'openai') {
+      return makeProvider({ kind: 'openai', ...config.openai });
     }
     if (config.kind === 'local') {
       return makeProvider({ kind: 'local' });

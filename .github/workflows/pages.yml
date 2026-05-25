@@ -38,6 +38,7 @@ jobs:
         run: |
           mkdir -p dist
           cp index.html dist/index.html
+          cp favicon.svg dist/favicon.svg
           cp .nojekyll dist/.nojekyll
 
       - name: Upload Pages artifact
