@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tabula — a page that rebuilds itself</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          serif: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          cream: '#faf7f1',
+          ink: '#1a1815',
+          terracotta: '#b04a2f',
+        }
+      }
+    }
+  };
+</script>
+
+<style>
+  body { background: #faf7f1; color: #1a1815; }
+  .stage-enter { animation: stageIn 0.5s ease-out; }
+  @keyframes stageIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .pulse-dot {
+    animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 0.3; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+  /* hide bootstrap pill on small mobile so generated content shines */
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+
+<body class="font-sans antialiased">
+
+<!-- Bootstrap pill: ALWAYS visible, outside #stage. Lifeline back to settings + reset. -->
+<div id="bootstrap-pill" class="fixed top-4 right-4 z-[9999] flex gap-2">
+  <button id="settings-btn"
+    class="bg-ink text-cream rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-700 transition shadow-lg"
+    title="provider settings">⚙ config</button>
+  <button id="reset-btn"
+    class="bg-cream border border-stone-300 text-stone-600 rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-100 hover:text-ink transition shadow-sm"
+    title="reset to bootstrap UI">↺ reset</button>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="hidden fixed inset-0 z-[10000] bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-cream border border-stone-300 max-w-md w-full p-6 shadow-2xl">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="font-serif italic text-2xl text-ink">provider config</h2>
+      <button id="settings-close" class="text-stone-400 hover:text-ink text-xl leading-none">×</button>
+    </div>
+
+    <div class="space-y-4 text-sm">
+      <div>
+        <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">provider</label>
+        <select id="provider-kind" class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+          <option value="anthropic">anthropic (claude)</option>
+          <option value="openai-compat">openai-compatible (ollama, lm studio, llama.cpp, vllm, openrouter, …)</option>
+        </select>
+      </div>
+
+      <!-- Anthropic fields -->
+      <div data-when="anthropic" class="space-y-4">
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key</label>
+          <input id="anthropic-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"
+            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
+          <input id="anthropic-model" value="claude-opus-4-7"
+            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+        </div>
+      </div>
+
+      <!-- OpenAI-compat fields -->
+      <div data-when="openai-compat" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">base url</label>
+          <input id="oac-base" value="http://localhost:11434/v1"
+            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+          <p class="text-[10px] text-stone-400 mt-1 leading-relaxed">
+            ollama: <code>http://localhost:11434/v1</code> · lm studio: <code>http://localhost:1234/v1</code> · llama.cpp: <code>http://localhost:8080/v1</code>
+          </p>
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
+          <input id="oac-model" placeholder="e.g. gemma3:4b, llama3.2, qwen2.5-coder:7b"
+            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key <span class="text-stone-400 normal-case">(optional, leave blank for local)</span></label>
+          <input id="oac-key" type="password" autocomplete="off" spellcheck="false"
+            class="w-full bg-white border border-stone-300 px-3 py-2 font-mono text-sm focus:outline-none focus:border-terracotta">
+        </div>
+        <div class="text-[10px] text-stone-500 bg-stone-100 border border-stone-200 p-2 leading-relaxed">
+          <strong class="text-terracotta">CORS:</strong> local servers must allow browser origins. For ollama:
+          <code class="bg-white px-1">OLLAMA_ORIGINS='*' ollama serve</code>. LM Studio enables CORS in the server tab.
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="settings-save"
+          class="bg-terracotta text-cream px-4 py-2 text-sm font-mono uppercase tracking-wider hover:bg-orange-700 transition">save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading" class="hidden fixed inset-0 z-[9998] bg-cream/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+  <div class="text-center">
+    <div class="flex gap-1.5 justify-center mb-3">
+      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0s"></div>
+      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0.2s"></div>
+      <div class="w-2 h-2 bg-terracotta rounded-full pulse-dot" style="animation-delay: 0.4s"></div>
+    </div>
+    <p class="font-mono text-xs uppercase tracking-widest text-stone-500" id="loading-label">generating…</p>
+  </div>
+</div>
+
+<!-- THE STAGE: everything inside gets replaced on each generation -->
+<div id="stage"></div>
+
+<script>
+  // ==========================================================================
+  // PROVIDER ABSTRACTION
+  // ==========================================================================
+  // Add a new provider by subclassing LLMProvider and implementing generate().
+  // Then register it in makeProvider().
+  // ==========================================================================
+
+  class LLMProvider {
+    /**
+     * @param {{systemPrompt: string, userPrompt: string, maxTokens?: number, signal?: AbortSignal}} opts
+     * @returns {Promise<string>}
+     */
+    async generate(opts) {
+      throw new Error('LLMProvider.generate not implemented');
+    }
+    get label() { return 'unknown'; }
+  }
+
+  class AnthropicProvider extends LLMProvider {
+    constructor({ apiKey, model = 'claude-opus-4-7' }) {
+      super();
+      this.apiKey = apiKey;
+      this.model = model;
+    }
+    get label() { return `anthropic · ${this.model}`; }
+    async generate({ systemPrompt, userPrompt, maxTokens = 4096, signal }) {
+      if (!this.apiKey) throw new Error('no anthropic api key set — open ⚙ config');
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`anthropic ${res.status}: ${t.slice(0, 400)}`);
+      }
+      const data = await res.json();
+      return data.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('');
+    }
+  }
+
+  class OpenAICompatProvider extends LLMProvider {
+    constructor({ baseUrl, apiKey, model }) {
+      super();
+      this.baseUrl = (baseUrl || '').replace(/\/$/, '');
+      this.apiKey = apiKey || '';
+      this.model = model;
+    }
+    get label() { return `openai-compat · ${this.model} @ ${this.baseUrl}`; }
+    async generate({ systemPrompt, userPrompt, maxTokens = 4096, signal }) {
+      if (!this.baseUrl) throw new Error('no base url set');
+      if (!this.model) throw new Error('no model set');
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
+      const res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        signal,
+        headers,
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: maxTokens,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          stream: false,
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`${this.baseUrl} ${res.status}: ${t.slice(0, 400)}`);
+      }
+      const data = await res.json();
+      return data?.choices?.[0]?.message?.content ?? '';
+    }
+  }
+
+  function makeProvider(cfg) {
+    switch (cfg.kind) {
+      case 'anthropic':     return new AnthropicProvider(cfg);
+      case 'openai-compat': return new OpenAICompatProvider(cfg);
+      default: throw new Error(`unknown provider kind: ${cfg.kind}`);
+    }
+  }
+
+  // ==========================================================================
+  // SYSTEM PROMPT for self-generation
+  // ==========================================================================
+
+  const SYSTEM_PROMPT = `You generate the complete inner HTML for an inline <div id="stage"> element on a page that rebuilds itself.
+
+ENVIRONMENT:
+- Tailwind CSS (Play CDN with MutationObserver) is loaded — every Tailwind utility class works on your output automatically.
+- Fonts available: 'Fraunces' (serif), 'JetBrains Mono' (mono), system-ui (sans).
+- Your output is injected via innerHTML, THEN any <script> tags you include ARE re-executed (the host page rewires them).
+- You have full access to window, document, fetch, and all browser APIs from within your <script> tags.
+- A small floating "config" + "reset" pill exists in the top-right corner outside #stage — do NOT try to remove it. Leave room (~80px) at the top-right so it doesn't overlap your design.
+
+HOST API (available in your scripts):
+- window.regenerate(prompt: string) — triggers a NEW generation that REPLACES the stage. Use this to make pages that include their own "generate again" prompts, remix buttons, or forms.
+- window.getLastPrompt() — returns the prompt that produced the current page.
+
+OUTPUT RULES (strict):
+- Output RAW HTML only. NO markdown fences, NO commentary, NO preamble, NO explanation.
+- Start with an opening tag (<div>, <main>, <article>…) and end with its closing tag.
+- Wrap everything in a single root element.
+- Inline all styles via Tailwind classes or <style> tags. NO external stylesheets.
+- Make it BEAUTIFUL. Commit to a strong aesthetic — bold maximalism or refined minimalism, but commit. No generic AI-slop gradients on white.
+- It should be a complete polished artifact, not a sketch.
+- If the user prompt is meta ("design the prompt page", "redesign yourself", "self-portrait"): create a rich, characterful prompt interface with a textarea wired to window.regenerate, plus interesting preset prompt buttons.
+
+Begin your output with the opening tag now.`;
+
+  // ==========================================================================
+  // STATE & PERSISTENCE
+  // ==========================================================================
+
+  const LS_KEY = 'tabula_config_v1';
+  const LS_LAST_PROMPT = 'tabula_last_prompt_v1';
+
+  const defaultConfig = {
+    kind: 'anthropic',
+    anthropic: { apiKey: '', model: 'claude-opus-4-7' },
+    openaiCompat: { baseUrl: 'http://localhost:11434/v1', apiKey: '', model: '' },
+  };
+
+  function loadConfig() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return structuredClone(defaultConfig);
+      return { ...structuredClone(defaultConfig), ...JSON.parse(raw) };
+    } catch {
+      return structuredClone(defaultConfig);
+    }
+  }
+  function saveConfig(c) {
+    localStorage.setItem(LS_KEY, JSON.stringify(c));
+  }
+
+  let config = loadConfig();
+  let lastPrompt = localStorage.getItem(LS_LAST_PROMPT) || '';
+  let currentAbort = null;
+
+  // ==========================================================================
+  // SETTINGS MODAL
+  // ==========================================================================
+
+  const $ = id => document.getElementById(id);
+  const modal = $('settings-modal');
+
+  function syncSettingsUI() {
+    $('provider-kind').value = config.kind;
+    $('anthropic-key').value = config.anthropic.apiKey;
+    $('anthropic-model').value = config.anthropic.model;
+    $('oac-base').value = config.openaiCompat.baseUrl;
+    $('oac-key').value = config.openaiCompat.apiKey;
+    $('oac-model').value = config.openaiCompat.model;
+    document.querySelectorAll('[data-when]').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.when !== config.kind);
+    });
+  }
+  function readSettingsUI() {
+    const kind = $('provider-kind').value;
+    return {
+      kind,
+      anthropic: {
+        apiKey: $('anthropic-key').value.trim(),
+        model: $('anthropic-model').value.trim() || 'claude-opus-4-7',
+      },
+      openaiCompat: {
+        baseUrl: $('oac-base').value.trim(),
+        apiKey: $('oac-key').value.trim(),
+        model: $('oac-model').value.trim(),
+      },
+    };
+  }
+
+  $('settings-btn').onclick = () => { syncSettingsUI(); modal.classList.remove('hidden'); };
+  $('settings-close').onclick = () => modal.classList.add('hidden');
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+  $('provider-kind').addEventListener('change', () => {
+    document.querySelectorAll('[data-when]').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.when !== $('provider-kind').value);
+    });
+  });
+  $('settings-save').onclick = () => {
+    config = readSettingsUI();
+    saveConfig(config);
+    modal.classList.add('hidden');
+  };
+
+  // ==========================================================================
+  // GENERATION
+  // ==========================================================================
+
+  const stage = $('stage');
+  const loadingEl = $('loading');
+  const loadingLabel = $('loading-label');
+
+  function buildProvider() {
+    if (config.kind === 'anthropic') {
+      return makeProvider({ kind: 'anthropic', ...config.anthropic });
+    }
+    return makeProvider({ kind: 'openai-compat', ...config.openaiCompat });
+  }
+
+  function stripFences(s) {
+    // Defense: some models wrap in ```html ... ``` despite instructions.
+    return s
+      .replace(/^\s*```(?:html|HTML)?\s*/, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+  }
+
+  function injectAndExecute(html) {
+    stage.innerHTML = html;
+    // Re-execute any <script> tags (innerHTML doesn't run scripts).
+    stage.querySelectorAll('script').forEach(old => {
+      const fresh = document.createElement('script');
+      for (const a of old.attributes) fresh.setAttribute(a.name, a.value);
+      fresh.textContent = old.textContent;
+      old.parentNode.replaceChild(fresh, old);
+    });
+    stage.classList.remove('stage-enter');
+    void stage.offsetWidth; // restart animation
+    stage.classList.add('stage-enter');
+  }
+
+  async function regenerate(prompt) {
+    if (!prompt || !prompt.trim()) return;
+    if (currentAbort) currentAbort.abort();
+    currentAbort = new AbortController();
+
+    const provider = buildProvider();
+    lastPrompt = prompt.trim();
+    localStorage.setItem(LS_LAST_PROMPT, lastPrompt);
+
+    loadingLabel.textContent = `generating · ${provider.label}`;
+    loadingEl.classList.remove('hidden');
+
+    try {
+      const raw = await provider.generate({
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt: prompt,
+        maxTokens: 8000,
+        signal: currentAbort.signal,
+      });
+      const html = stripFences(raw);
+      if (!html || !html.startsWith('<')) {
+        throw new Error('model did not return HTML. raw: ' + raw.slice(0, 200));
+      }
+      injectAndExecute(html);
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      injectAndExecute(`
+        <div class="min-h-screen flex items-center justify-center p-6">
+          <div class="max-w-lg bg-white border border-terracotta/40 p-6">
+            <p class="font-mono text-xs uppercase tracking-wider text-terracotta mb-2">generation failed</p>
+            <p class="text-sm text-ink mb-4">${e.message.replace(/</g, '&lt;')}</p>
+            <button onclick="renderBootstrap()" class="text-xs font-mono uppercase tracking-wider underline text-stone-600 hover:text-ink">back to bootstrap →</button>
+          </div>
+        </div>
+      `);
+    } finally {
+      loadingEl.classList.add('hidden');
+      currentAbort = null;
+    }
+  }
+
+  // Host API exposed to generated pages.
+  window.regenerate = regenerate;
+  window.getLastPrompt = () => lastPrompt;
+
+  // ==========================================================================
+  // BOOTSTRAP UI (initial stage content)
+  // ==========================================================================
+
+  function renderBootstrap() {
+    stage.innerHTML = `
+      <main class="min-h-screen flex items-center justify-center p-6">
+        <div class="max-w-2xl w-full">
+          <div class="mb-10">
+            <h1 class="font-serif italic font-medium text-7xl text-ink leading-none mb-3">tabula<span class="text-terracotta">.</span></h1>
+            <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-stone-500">a page that rebuilds itself from text</p>
+          </div>
+
+          <div class="bg-white border border-stone-300 shadow-sm">
+            <textarea id="bp-prompt" rows="4"
+              class="w-full p-4 font-sans text-base text-ink placeholder:text-stone-400 focus:outline-none resize-none bg-transparent"
+              placeholder="describe what this page should become…"></textarea>
+            <div class="border-t border-stone-200 px-3 py-2 flex items-center justify-between gap-2">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-stone-400">⏎ to generate · ⇧⏎ for newline</span>
+              <button onclick="window.regenerate(document.getElementById('bp-prompt').value)"
+                class="bg-ink text-cream px-4 py-1.5 text-xs font-mono uppercase tracking-wider hover:bg-stone-700 transition">
+                generate →
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button data-preset="Design the perfect prompt interface for a generative web canvas where users type a description and the page rebuilds itself into whatever they describe. Make it beautiful, characterful, slightly weird. Include 3-4 interesting preset prompt buttons that themselves call window.regenerate."
+              class="preset-btn">✦ self-portrait</button>
+            <button data-preset="Build a haiku composer: textarea where I type, and live syllable counters for each of the three lines (5-7-5). Beautiful typography, restrained palette."
+              class="preset-btn">haiku composer</button>
+            <button data-preset="Create a small interactive solar system. Realistic-ish orbits, animated, with a slider to speed up or slow down time. Dark space background with subtle stars."
+              class="preset-btn">solar system</button>
+            <button data-preset="Make a brutalist landing page for a fictional 1970s synthesizer company. Heavy serif type, asymmetric grid, technical specs in tables."
+              class="preset-btn">brutalist landing</button>
+            <button data-preset="Build a working tic-tac-toe vs a minimax AI opponent. Score tracking, reset button, win highlight animation."
+              class="preset-btn">tic-tac-toe</button>
+          </div>
+
+          <details class="mt-10 group">
+            <summary class="font-mono text-[10px] uppercase tracking-wider text-stone-400 hover:text-ink select-none">
+              <span class="group-open:hidden">▸ how this works</span>
+              <span class="hidden group-open:inline">▾ how this works</span>
+            </summary>
+            <div class="mt-3 text-xs leading-relaxed text-stone-600 space-y-2 font-mono">
+              <p>• your prompt goes to a configurable llm provider (claude or any openai-compatible endpoint — ollama, lm studio, llama.cpp, vllm, openrouter…)</p>
+              <p>• the model returns raw html which replaces #stage. tailwind utilities and inline &lt;script&gt; tags work.</p>
+              <p>• generated pages can call <code class="text-terracotta">window.regenerate(prompt)</code> to trigger the next generation — pages can reproduce themselves.</p>
+              <p>• the floating ⚙ and ↺ pill in the top-right always survives. that's your lifeline.</p>
+              <p>• click ⚙ config to switch providers or set a local model.</p>
+            </div>
+          </details>
+        </div>
+      </main>
+      <style>
+        .preset-btn {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          text-transform: lowercase;
+          color: rgb(87 83 78);
+          background: white;
+          border: 1px solid rgb(214 211 209);
+          padding: 6px 12px;
+          border-radius: 9999px;
+          transition: all 0.1s;
+          cursor: pointer;
+        }
+        .preset-btn:hover {
+          color: #b04a2f;
+          border-color: #b04a2f;
+        }
+      </style>
+    `;
+    // Wire presets + enter-to-submit
+    document.querySelectorAll('.preset-btn').forEach(b => {
+      b.onclick = () => regenerate(b.dataset.preset);
+    });
+    const ta = document.getElementById('bp-prompt');
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        regenerate(ta.value);
+      }
+    });
+    ta.focus();
+  }
+  window.renderBootstrap = renderBootstrap;
+
+  $('reset-btn').onclick = () => {
+    if (currentAbort) currentAbort.abort();
+    renderBootstrap();
+  };
+
+  // ==========================================================================
+  // INITIAL RENDER
+  // ==========================================================================
+
+  renderBootstrap();
+</script>
+
+</body>
+</html>
