@@ -43,12 +43,22 @@
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .pulse-dot {
-    animation: pulseDot 1.4s ease-in-out infinite;
+  .loading-shimmer {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 35%;
+    background: #0a0a0a;
+    animation: shimmer 1.6s cubic-bezier(.4,0,.6,1) infinite;
   }
-  @keyframes pulseDot {
-    0%, 100% { opacity: 0.2; transform: scale(0.85); }
-    50% { opacity: 1; transform: scale(1); }
+  @keyframes shimmer {
+    0%   { left: -35%; }
+    100% { left: 100%; }
+  }
+  .clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   details > summary { cursor: pointer; list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
@@ -70,10 +80,10 @@
     <button id="cm-toggle" class="text-paper text-sm leading-none px-1 hover:opacity-70" title="expand">+</button>
   </div>
   <div id="cm-body" class="p-2 space-y-2">
-    <textarea id="cm-prompt" rows="3" placeholder="describe a new page… (⏎ to generate)"
+    <textarea id="cm-prompt" rows="3" placeholder="describe a change to this page… (⏎ to apply)"
       class="w-full bg-white border border-ink px-2 py-1 text-[11px] text-ink placeholder:text-stone-400 focus:outline-none resize-none"></textarea>
     <button id="cm-generate"
-      class="w-full bg-ink text-paper border border-ink px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-white hover:text-ink transition">generate →</button>
+      class="w-full bg-ink text-paper border border-ink px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-white hover:text-ink transition">modify →</button>
     <div class="grid grid-cols-3 gap-1">
       <button id="cm-copy" class="border border-ink px-1 py-1 text-[9px] uppercase tracking-wider hover:bg-ink hover:text-paper transition" title="copy share url">copy url</button>
       <button id="cm-config" class="border border-ink px-1 py-1 text-[9px] uppercase tracking-wider hover:bg-ink hover:text-paper transition" title="provider settings">config</button>
@@ -96,7 +106,6 @@
         <select id="provider-kind" class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
           <option value="anthropic">anthropic (claude)</option>
           <option value="openai">openai (responses)</option>
-          <option value="openai-compat">openai-compatible (ollama, lm studio, llama.cpp, vllm, openrouter, …)</option>
           <option value="local">local · chrome built-in (gemini nano)</option>
         </select>
       </div>
@@ -136,32 +145,6 @@
         </div>
       </div>
 
-      <!-- OpenAI-compat fields -->
-      <div data-when="openai-compat" class="space-y-4 hidden">
-        <div>
-          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">base url</label>
-          <input id="oac-base" value="http://localhost:11434/v1"
-            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
-          <p class="text-[10px] text-stone-400 mt-1 leading-relaxed">
-            ollama: <code>http://localhost:11434/v1</code> · lm studio: <code>http://localhost:1234/v1</code> · llama.cpp: <code>http://localhost:8080/v1</code>
-          </p>
-        </div>
-        <div>
-          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">model</label>
-          <input id="oac-model" placeholder="e.g. gemma3:4b, llama3.2, qwen2.5-coder:7b"
-            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
-        </div>
-        <div>
-          <label class="block text-xs font-mono uppercase tracking-wider text-stone-500 mb-1">api key <span class="text-stone-400 normal-case">(optional, leave blank for local)</span></label>
-          <input id="oac-key" type="password" autocomplete="off" spellcheck="false"
-            class="w-full bg-white border border-ink px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ink">
-        </div>
-        <div class="text-[10px] text-stone-600 bg-stone-50 border border-stone-300 p-2 leading-relaxed">
-          <strong class="text-ink">CORS:</strong> local servers must allow browser origins. For ollama:
-          <code class="bg-white border border-stone-300 px-1">OLLAMA_ORIGINS='*' ollama serve</code>. LM Studio enables CORS in the server tab.
-        </div>
-      </div>
-
       <!-- Local on-device fields -->
       <div data-when="local" class="space-y-3 hidden">
         <p class="text-xs text-stone-600 leading-relaxed">
@@ -185,14 +168,22 @@
 </div>
 
 <!-- Loading overlay -->
-<div id="loading" class="hidden fixed inset-0 z-[9998] bg-white/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-  <div class="text-center">
-    <div class="flex gap-1.5 justify-center mb-3">
-      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0s"></div>
-      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0.2s"></div>
-      <div class="w-2 h-2 bg-ink pulse-dot" style="animation-delay: 0.4s"></div>
+<div id="loading" class="hidden fixed inset-0 z-[9998] bg-white/85 backdrop-blur-sm flex items-center justify-center p-6">
+  <div class="bg-white border border-ink shadow-[8px_8px_0_0_#0a0a0a] w-full max-w-md font-mono">
+    <div class="flex items-center justify-between bg-ink text-paper px-3 py-1.5">
+      <span class="text-[10px] uppercase tracking-widest">seed · generating</span>
+      <span class="text-[10px] tabular-nums" id="loading-timer">00:00</span>
     </div>
-    <p class="font-mono text-xs uppercase tracking-widest text-stone-500" id="loading-label">generating…</p>
+    <div class="p-4 space-y-3">
+      <p id="loading-prompt" class="text-[11px] text-stone-600 italic leading-snug border-l-2 border-ink pl-2 clamp-3 min-h-[1rem]"></p>
+      <div class="relative h-1 bg-stone-100 overflow-hidden">
+        <div class="loading-shimmer"></div>
+      </div>
+      <div class="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-stone-500">
+        <span id="loading-label" class="truncate">contacting model…</span>
+        <button id="loading-cancel" class="text-stone-500 hover:text-ink underline shrink-0" title="cancel (esc)">cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -299,42 +290,6 @@
     }
   }
 
-  class OpenAICompatProvider extends LLMProvider {
-    constructor({ baseUrl, apiKey, model }) {
-      super();
-      this.baseUrl = (baseUrl || '').replace(/\/$/, '');
-      this.apiKey = apiKey || '';
-      this.model = model;
-    }
-    get label() { return `openai-compat · ${this.model} @ ${this.baseUrl}`; }
-    async generate({ systemPrompt, userPrompt, maxTokens = 4096, signal }) {
-      if (!this.baseUrl) throw new Error('no base url set');
-      if (!this.model) throw new Error('no model set');
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
-      const res = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal,
-        headers,
-        body: JSON.stringify({
-          model: this.model,
-          max_tokens: maxTokens,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          stream: false,
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`${this.baseUrl} ${res.status}: ${t.slice(0, 400)}`);
-      }
-      const data = await res.json();
-      return data?.choices?.[0]?.message?.content ?? '';
-    }
-  }
-
   class LocalLanguageModelProvider extends LLMProvider {
     get label() { return 'local · gemini nano (on-device)'; }
     async generate({ systemPrompt, userPrompt, signal, onProgress }) {
@@ -345,16 +300,57 @@
       if (availability === 'unavailable') {
         throw new Error('local model unavailable on this device');
       }
+      // When the model is already on-device, Chrome still fires downloadprogress
+      // events (0 → 1) as part of session init — those are not a real download.
+      const needsDownload = availability !== 'available' && availability !== 'readily';
+      if (onProgress) {
+        onProgress(needsDownload
+          ? 'downloading model · ~1–2 GB, this can take several minutes'
+          : 'loading model into memory…');
+      }
       const session = await LanguageModel.create({
         initialPrompts: [{ role: 'system', content: systemPrompt }],
         monitor(m) {
           m.addEventListener('downloadprogress', (e) => {
-            if (onProgress) onProgress(`downloading model · ${(e.loaded * 100).toFixed(1)}%`);
+            if (!onProgress || !needsDownload) return;
+            // Chrome's Prompt API typically only fires this at the boundaries
+            // (loaded=0 at start, loaded=1 at end), so a precise percent would
+            // flip between 0% and 100% — show indeterminate copy instead.
+            if (e.loaded >= 1) {
+              onProgress('model downloaded · initializing…');
+            } else if (e.loaded > 0) {
+              onProgress(`downloading model · ${(e.loaded * 100).toFixed(0)}%`);
+            } else {
+              onProgress('downloading model · ~1–2 GB, this can take several minutes');
+            }
           });
         },
       });
+      if (onProgress) onProgress(`generating · ${this.label}`);
       try {
-        return await session.prompt(userPrompt, { signal });
+        const quota = typeof session.inputQuota === 'number' ? session.inputQuota : null;
+        const used = typeof session.inputUsage === 'number' ? session.inputUsage : null;
+        if (quota !== null) {
+          console.log('[seed:local] session — inputQuota:', quota, 'inputUsage(system):', used, 'remaining:', quota - used);
+        }
+        if (typeof session.measureInputUsage === 'function') {
+          try {
+            const measured = await session.measureInputUsage(userPrompt);
+            if (quota !== null) {
+              const remaining = quota - used;
+              console.log('[seed:local] userPrompt tokens:', measured, '— fits in remaining budget (' + remaining + '):', measured <= remaining);
+              if (measured > remaining) console.warn('[seed:local] userPrompt EXCEEDS available token budget — model will likely fail or return junk');
+            } else {
+              console.log('[seed:local] userPrompt tokens:', measured);
+            }
+          } catch (err) {
+            console.log('[seed:local] measureInputUsage failed:', err.message);
+          }
+        }
+        const result = await session.prompt(userPrompt, { signal });
+        console.log('[seed:local] response received — chars:', result?.length || 0, 'first 200:', (result || '').slice(0, 200));
+        if (typeof session.inputUsage === 'number') console.log('[seed:local] inputUsage after prompt:', session.inputUsage);
+        return result;
       } finally {
         try { session.destroy(); } catch {}
       }
@@ -363,10 +359,9 @@
 
   function makeProvider(cfg) {
     switch (cfg.kind) {
-      case 'anthropic':     return new AnthropicProvider(cfg);
-      case 'openai':        return new OpenAIProvider(cfg);
-      case 'openai-compat': return new OpenAICompatProvider(cfg);
-      case 'local':         return new LocalLanguageModelProvider();
+      case 'anthropic': return new AnthropicProvider(cfg);
+      case 'openai':    return new OpenAIProvider(cfg);
+      case 'local':     return new LocalLanguageModelProvider();
       default: throw new Error(`unknown provider kind: ${cfg.kind}`);
     }
   }
@@ -457,25 +452,49 @@ OUTPUT RULES (strict):
 
 Begin your output with the opening tag now.`;
 
+  const MODIFY_SYSTEM_PROMPT = `You modify the inner HTML of an inline <div id="stage"> on a self-modifying webpage. You receive the CURRENT HTML and a CHANGE REQUEST, and return the FULL updated HTML.
+
+ENVIRONMENT:
+- Tailwind CSS (Play CDN) is loaded — every Tailwind utility class works on your output.
+- Fonts available: 'JetBrains Mono' (mono, the house font), system-ui (sans).
+- Your output is injected via innerHTML, and any <script> tags you include ARE re-executed.
+- A draggable "seed · control" panel floats above the page OUTSIDE #stage — do NOT add or try to remove it.
+
+HOST API (available in your scripts):
+- window.regenerate(prompt: string) — triggers a NEW generation that REPLACES the stage.
+- window.getLastPrompt() — returns the last prompt.
+
+MODIFICATION RULES:
+- Modify, do not rewrite. Preserve everything about the current page — structure, styling, content, scripts, identifiers, aesthetic — except what the CHANGE REQUEST asks you to alter.
+- Keep the same overall look, voice, and behavior. Don't introduce a new design language.
+- Return the FULL updated HTML for #stage, not a diff and not just the changed section.
+
+OUTPUT RULES (strict):
+- Output RAW HTML only. NO markdown fences, NO commentary, NO preamble.
+- Start with an opening tag and end with its closing tag, wrapped in a single root element.
+- Inline all styles via Tailwind classes or <style> tags.
+
+Begin your output with the opening tag now.`;
+
   // ==========================================================================
   // STATE & PERSISTENCE
   // ==========================================================================
 
   const LS_KEY = 'seed_config_v1';
-  const LS_LAST_PROMPT = 'seed_last_prompt_v1';
 
   const defaultConfig = {
     kind: 'anthropic',
     anthropic: { apiKey: '', model: 'claude-sonnet-4-6' },
     openai: { apiKey: '', model: 'gpt-5.5' },
-    openaiCompat: { baseUrl: 'http://localhost:11434/v1', apiKey: '', model: '' },
   };
 
   function loadConfig() {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return structuredClone(defaultConfig);
-      return { ...structuredClone(defaultConfig), ...JSON.parse(raw) };
+      const merged = { ...structuredClone(defaultConfig), ...JSON.parse(raw) };
+      if (!['anthropic', 'openai', 'local'].includes(merged.kind)) merged.kind = 'anthropic';
+      return merged;
     } catch {
       return structuredClone(defaultConfig);
     }
@@ -508,13 +527,12 @@ Begin your output with the opening tag now.`;
     }
     const ok =
       (cfg.kind === 'anthropic' && !!cfg.anthropic.apiKey) ||
-      (cfg.kind === 'openai' && !!cfg.openai.apiKey && !!cfg.openai.model) ||
-      (cfg.kind === 'openai-compat' && !!(cfg.openaiCompat.baseUrl && cfg.openaiCompat.model));
+      (cfg.kind === 'openai' && !!cfg.openai.apiKey && !!cfg.openai.model);
     updateStatusDot(ok);
   }
 
   let config = loadConfig();
-  let lastPrompt = localStorage.getItem(LS_LAST_PROMPT) || '';
+  let lastPrompt = '';
   let currentAbort = null;
 
   // ==========================================================================
@@ -530,9 +548,6 @@ Begin your output with the opening tag now.`;
     $('anthropic-model').value = config.anthropic.model;
     $('openai-key').value = config.openai.apiKey;
     $('openai-model').value = config.openai.model;
-    $('oac-base').value = config.openaiCompat.baseUrl;
-    $('oac-key').value = config.openaiCompat.apiKey;
-    $('oac-model').value = config.openaiCompat.model;
     document.querySelectorAll('[data-when]').forEach(el => {
       el.classList.toggle('hidden', el.dataset.when !== config.kind);
     });
@@ -548,11 +563,6 @@ Begin your output with the opening tag now.`;
       openai: {
         apiKey: $('openai-key').value.trim(),
         model: $('openai-model').value.trim() || 'gpt-5.5',
-      },
-      openaiCompat: {
-        baseUrl: $('oac-base').value.trim(),
-        apiKey: $('oac-key').value.trim(),
-        model: $('oac-model').value.trim(),
       },
     };
   }
@@ -604,6 +614,7 @@ Begin your output with the opening tag now.`;
     saveConfig(config);
     modal.classList.add('hidden');
     refreshStatusDot();
+    if (document.getElementById('bp-prompt')) renderBootstrap();
   };
 
   // ==========================================================================
@@ -613,6 +624,31 @@ Begin your output with the opening tag now.`;
   const stage = $('stage');
   const loadingEl = $('loading');
   const loadingLabel = $('loading-label');
+  const loadingTimer = $('loading-timer');
+  const loadingPrompt = $('loading-prompt');
+
+  let timerInterval = null;
+  function startLoadingTimer() {
+    const start = Date.now();
+    loadingTimer.textContent = '00:00';
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      const sec = Math.floor((Date.now() - start) / 1000);
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      loadingTimer.textContent = `${m}:${s}`;
+    }, 500);
+  }
+  function stopLoadingTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  $('loading-cancel').onclick = () => { if (currentAbort) currentAbort.abort(); };
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !loadingEl.classList.contains('hidden') && currentAbort) {
+      currentAbort.abort();
+    }
+  });
 
   function buildProvider() {
     if (config.kind === 'anthropic') {
@@ -621,10 +657,7 @@ Begin your output with the opening tag now.`;
     if (config.kind === 'openai') {
       return makeProvider({ kind: 'openai', ...config.openai });
     }
-    if (config.kind === 'local') {
-      return makeProvider({ kind: 'local' });
-    }
-    return makeProvider({ kind: 'openai-compat', ...config.openaiCompat });
+    return makeProvider({ kind: 'local' });
   }
 
   function stripFences(s) {
@@ -641,7 +674,17 @@ Begin your output with the opening tag now.`;
     stage.querySelectorAll('script').forEach(old => {
       const fresh = document.createElement('script');
       for (const a of old.attributes) fresh.setAttribute(a.name, a.value);
-      fresh.textContent = old.textContent;
+      // Wrap inline classic scripts in an IIFE so top-level const/let don't leak
+      // into the document's script realm — without this, modifying a page whose
+      // scripts declare `const foo = ...` throws "Identifier 'foo' has already
+      // been declared" when the same script is re-injected.
+      const isInline = !old.src && old.textContent;
+      const isModule = (old.type || '').toLowerCase() === 'module';
+      if (isInline && !isModule) {
+        fresh.textContent = `(function(){\n${old.textContent}\n})();`;
+      } else {
+        fresh.textContent = old.textContent;
+      }
       old.parentNode.replaceChild(fresh, old);
     });
     stage.classList.remove('stage-enter');
@@ -656,9 +699,10 @@ Begin your output with the opening tag now.`;
 
     const provider = buildProvider();
     lastPrompt = prompt.trim();
-    localStorage.setItem(LS_LAST_PROMPT, lastPrompt);
 
+    loadingPrompt.textContent = lastPrompt;
     loadingLabel.textContent = `generating · ${provider.label}`;
+    startLoadingTimer();
     loadingEl.classList.remove('hidden');
 
     try {
@@ -690,6 +734,67 @@ Begin your output with the opening tag now.`;
       `);
     } finally {
       loadingEl.classList.add('hidden');
+      stopLoadingTimer();
+      currentAbort = null;
+    }
+  }
+
+  async function modifyPage(prompt) {
+    if (!prompt || !prompt.trim()) return;
+    if (currentAbort) currentAbort.abort();
+    currentAbort = new AbortController();
+
+    const provider = buildProvider();
+    const currentHtml = stage.innerHTML;
+    lastPrompt = prompt.trim();
+
+    const userPrompt = `CURRENT HTML:\n${currentHtml}\n\nCHANGE REQUEST:\n${lastPrompt}`;
+
+    console.log('[seed:modify] provider:', provider.label);
+    console.log('[seed:modify] currentHtml chars:', currentHtml.length, '~tokens:', Math.ceil(currentHtml.length / 4));
+    console.log('[seed:modify] userPrompt chars:', userPrompt.length, '~tokens:', Math.ceil(userPrompt.length / 4));
+    console.log('[seed:modify] change request:', lastPrompt);
+
+    loadingPrompt.textContent = lastPrompt;
+    loadingLabel.textContent = `modifying · ${provider.label}`;
+    startLoadingTimer();
+    loadingEl.classList.remove('hidden');
+
+    try {
+      const raw = await provider.generate({
+        systemPrompt: MODIFY_SYSTEM_PROMPT,
+        userPrompt,
+        maxTokens: 32000,
+        signal: currentAbort.signal,
+        onProgress: (msg) => { loadingLabel.textContent = msg; },
+      });
+      console.log('[seed:modify] raw response chars:', raw?.length || 0);
+      console.log('[seed:modify] raw response (first 500):', (raw || '').slice(0, 500));
+      console.log('[seed:modify] raw response (last 200):', (raw || '').slice(-200));
+      const html = stripFences(raw);
+      console.log('[seed:modify] stripped html chars:', html.length, 'starts with:', html.slice(0, 80));
+      if (!html || !html.startsWith('<')) {
+        throw new Error('model did not return HTML. raw: ' + raw.slice(0, 200));
+      }
+      injectAndExecute(html);
+      try { writeStateToUrl(await encodeState(html)); }
+      catch (err) { console.warn('seed: failed to encode state to url —', err); }
+      revealControlModal();
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      console.error('[seed:modify] error:', e);
+      injectAndExecute(`
+        <div class="min-h-screen flex items-center justify-center p-6">
+          <div class="max-w-lg bg-white border border-ink p-6 shadow-[6px_6px_0_0_#0a0a0a]">
+            <p class="font-mono text-xs uppercase tracking-wider text-ink mb-2">modification failed</p>
+            <p class="text-sm text-ink mb-4">${e.message.replace(/</g, '&lt;')}</p>
+            <button onclick="renderBootstrap()" class="text-xs font-mono uppercase tracking-wider underline text-stone-600 hover:text-ink">back to bootstrap →</button>
+          </div>
+        </div>
+      `);
+    } finally {
+      loadingEl.classList.add('hidden');
+      stopLoadingTimer();
       currentAbort = null;
     }
   }
@@ -701,6 +806,32 @@ Begin your output with the opening tag now.`;
   // ==========================================================================
   // BOOTSTRAP UI (initial stage content)
   // ==========================================================================
+
+  const RICH_PRESETS = [
+    { label: 'self-portrait', prompt: "Design the definitive prompt interface for seed, a self-modifying webpage where a single line of text rebuilds the entire page into whatever the visitor describes. Commit hard to a refined minimalist black-and-white aesthetic: square boxes, hairline ink borders, JetBrains Mono everywhere, generous whitespace, a single chunky offset drop-shadow on the main card. Center a large prompt textarea wired to window.regenerate, with an enter-to-submit hint. Below it, include 4 characterful preset buttons that each call window.regenerate with their own long, detailed, opinionated prompt. Add a tasteful one-line manifesto about a page that rewrites itself. Make it feel like a precise design tool, not an AI demo." },
+    { label: 'pokédex', prompt: "Build a vibrant Pokemon-themed fan website for a fictional starter region. Big bold hero with a region name and tagline, a responsive grid of at least 8 collectible Pokemon cards (made-up creatures) each with a name, two color-coded type badges, an HP bar, a flavor-text description, and a simple stat block (ATK / DEF / SPD) drawn as little bars. Use a bright, energetic palette inspired by the games (red, blue, yellow, white), rounded card corners, chunky drop shadows, and a clean game-UI feel. Add a type-filter row of buttons that hides and shows cards by type using inline script. Playful, polished, and fully interactive." },
+    { label: "tic-tac-toe '96", prompt: "Build a fully playable tic-tac-toe drenched in maximalist 1996 GeoCities / Windows 95 web nostalgia. Beveled gray 3D buttons and borders, a tiled starfield or checkered background, a scrolling marquee banner, a fake hit-counter that says you are visitor number 000142, an 'under construction' gif vibe (recreate with CSS, no external images), garish rainbow WordArt-style heading, and Comic-Sans-energy fonts. The game itself must actually work: play against a minimax AI that never loses, track wins/losses/draws, highlight the winning line, and have a reset button. Lean all the way into the cheesy retro vibe while the gameplay stays solid." },
+    { label: 'solar system', prompt: "Create an interactive solar system simulation. Render the sun and the planets with believable relative sizes and animated elliptical-ish orbits using CSS animations or canvas. Dark deep-space background with a subtle parallax starfield. Include a time-speed slider that smoothly speeds up and slows down all orbital motion, a pause button, and clickable planets that pop up a small info panel with fun facts. Smooth, hypnotic, and elegant." },
+    { label: 'haiku', prompt: "Build a focused haiku composer. A large central editor with three lines, and live per-line syllable counters showing the target 5 / 7 / 5 that turn from gray to ink-filled when a line hits its count, with a gentle satisfying state when all three are correct. Beautiful restrained typography, lots of negative space, a thin ink rule between lines, and a tiny rotating writing prompt for inspiration. Calm, literary, and precise." },
+  ];
+
+  // Tiny prompts for the on-device Gemini Nano provider, which shares a ~4–6K
+  // token window across system prompt + user prompt + output. Keep these short
+  // and ask for small, mostly-static pages.
+  const LITE_PRESETS = [
+    { label: 'contact form', prompt: "A simple centered contact form with name, email, message fields and a submit button. Plain black-and-white styling." },
+    { label: 'todo list', prompt: "A small todo list: one input, an add button, and a list below. Items can be checked off. Keep it minimal." },
+    { label: 'profile card', prompt: "A single profile card centered on the page: name, role, one-line bio, and three small social links. Clean and minimal." },
+    { label: 'menu', prompt: "A short cafe menu page with 5 items, each with a name, one-line description, and a price. Simple typography." },
+    { label: 'counter', prompt: "A big centered number starting at 0 with + and - buttons that increment and decrement it. Minimal black-and-white." },
+  ];
+
+  function renderPresetButtons() {
+    const presets = config.kind === 'local' ? LITE_PRESETS : RICH_PRESETS;
+    return presets.map(p =>
+      `<button data-preset="${p.prompt.replace(/"/g, '&quot;')}" class="preset-btn">${p.label}</button>`
+    ).join('\n            ');
+  }
 
   function renderBootstrap() {
     clearStateFromUrl();
@@ -730,16 +861,7 @@ Begin your output with the opening tag now.`;
           </div>
 
           <div class="mt-5 flex flex-wrap gap-2">
-            <button data-preset="Design the definitive prompt interface for seed, a self-modifying webpage where a single line of text rebuilds the entire page into whatever the visitor describes. Commit hard to a refined minimalist black-and-white aesthetic: square boxes, hairline ink borders, JetBrains Mono everywhere, generous whitespace, a single chunky offset drop-shadow on the main card. Center a large prompt textarea wired to window.regenerate, with an enter-to-submit hint. Below it, include 4 characterful preset buttons that each call window.regenerate with their own long, detailed, opinionated prompt. Add a tasteful one-line manifesto about a page that rewrites itself. Make it feel like a precise design tool, not an AI demo."
-              class="preset-btn">self-portrait</button>
-            <button data-preset="Build a vibrant Pokemon-themed fan website for a fictional starter region. Big bold hero with a region name and tagline, a responsive grid of at least 8 collectible Pokemon cards (made-up creatures) each with a name, two color-coded type badges, an HP bar, a flavor-text description, and a simple stat block (ATK / DEF / SPD) drawn as little bars. Use a bright, energetic palette inspired by the games (red, blue, yellow, white), rounded card corners, chunky drop shadows, and a clean game-UI feel. Add a type-filter row of buttons that hides and shows cards by type using inline script. Playful, polished, and fully interactive."
-              class="preset-btn">pokédex</button>
-            <button data-preset="Build a fully playable tic-tac-toe drenched in maximalist 1996 GeoCities / Windows 95 web nostalgia. Beveled gray 3D buttons and borders, a tiled starfield or checkered background, a scrolling marquee banner, a fake hit-counter that says you are visitor number 000142, an 'under construction' gif vibe (recreate with CSS, no external images), garish rainbow WordArt-style heading, and Comic-Sans-energy fonts. The game itself must actually work: play against a minimax AI that never loses, track wins/losses/draws, highlight the winning line, and have a reset button. Lean all the way into the cheesy retro vibe while the gameplay stays solid."
-              class="preset-btn">tic-tac-toe '96</button>
-            <button data-preset="Create an interactive solar system simulation. Render the sun and the planets with believable relative sizes and animated elliptical-ish orbits using CSS animations or canvas. Dark deep-space background with a subtle parallax starfield. Include a time-speed slider that smoothly speeds up and slows down all orbital motion, a pause button, and clickable planets that pop up a small info panel with fun facts. Smooth, hypnotic, and elegant."
-              class="preset-btn">solar system</button>
-            <button data-preset="Build a focused haiku composer. A large central editor with three lines, and live per-line syllable counters showing the target 5 / 7 / 5 that turn from gray to ink-filled when a line hits its count, with a gentle satisfying state when all three are correct. Beautiful restrained typography, lots of negative space, a thin ink rule between lines, and a tiny rotating writing prompt for inspiration. Calm, literary, and precise."
-              class="preset-btn">haiku</button>
+            ${renderPresetButtons()}
           </div>
 
           <button id="bp-explain" type="button"
@@ -793,7 +915,7 @@ Begin your output with the opening tag now.`;
 
     const explainBtn = document.getElementById('bp-explain');
     if (explainBtn) {
-      explainBtn.onclick = () => injectTa('Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAICompatProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.');
+      explainBtn.onclick = () => injectTa('Build a single-page website that explains the codebase of "seed" — a self-modifying webpage — and exactly how it works. seed is one self-contained index.html: a visitor types a description into a prompt box, a configurable LLM provider returns raw HTML, and that HTML is injected into a #stage element (via innerHTML, with inline script tags re-executed) — replacing the page with itself. Document these parts as clear, well-designed sections: (1) the provider abstraction — an LLMProvider base class with AnthropicProvider, OpenAIProvider, and a LocalLanguageModelProvider that uses Chrome\'s on-device window.LanguageModel (Gemini Nano); (2) the system prompt that tells the model to return raw, beautiful, fully self-contained HTML; (3) the generation pipeline: regenerate(prompt) -> provider.generate -> strip code fences -> inject and re-execute scripts; (4) URL state — the rendered HTML is gzip-compressed and base64url-encoded into the ?s= query parameter, so any page is shareable and restorable from the link alone with no server or storage; (5) the host API exposed to generated pages: window.regenerate(prompt) and window.getLastPrompt(); (6) the always-present draggable control panel for regenerate, copy share URL, config, and reset. Include an architecture diagram or flow and a data-flow walkthrough. Commit hard to seed\'s house style: refined minimalist black and white, square boxes, hairline ink borders, JetBrains Mono everywhere, chunky offset drop-shadows, and generous whitespace.');
     }
 
     const bpConfigBtn = document.getElementById('bp-config-btn');
@@ -814,9 +936,9 @@ Begin your output with the opening tag now.`;
     if (currentAbort) currentAbort.abort();
     renderBootstrap();
   };
-  $('cm-generate').onclick = () => regenerate($('cm-prompt').value);
+  $('cm-generate').onclick = () => modifyPage($('cm-prompt').value);
   $('cm-prompt').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); regenerate($('cm-prompt').value); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); modifyPage($('cm-prompt').value); }
   });
   $('cm-copy').onclick = async () => {
     const btn = $('cm-copy'), original = btn.textContent, url = location.href;
@@ -829,7 +951,6 @@ Begin your output with the opening tag now.`;
 
   const cm = $('control-modal');
   const cmHeader = $('cm-header');
-  const MODAL_POS_KEY = 'seed_modal_pos_v1';
 
   function clampPos(left, top) {
     const maxLeft = Math.max(0, window.innerWidth - cm.offsetWidth);
@@ -845,14 +966,7 @@ Begin your output with the opening tag now.`;
     cm.style.top = p.top + 'px';
     cm.style.right = 'auto';
   }
-  function savePos() {
-    localStorage.setItem(MODAL_POS_KEY, JSON.stringify({ left: cm.offsetLeft, top: cm.offsetTop }));
-  }
   function restorePos() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(MODAL_POS_KEY));
-      if (saved && typeof saved.left === 'number') { setPos(saved.left, saved.top); return; }
-    } catch {}
     setPos(window.innerWidth - cm.offsetWidth - 16, 16); // default: top-right
   }
 
@@ -871,7 +985,6 @@ Begin your output with the opening tag now.`;
     if (!dragging) return;
     dragging = false;
     cmHeader.releasePointerCapture(e.pointerId);
-    savePos();
   });
   window.addEventListener('resize', () => setPos(cm.offsetLeft, cm.offsetTop));
 
