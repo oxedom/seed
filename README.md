@@ -2,6 +2,8 @@
 
 **a self-modifying webpage.**
 
+🔗 **[try it live → oxedom.github.io/seed](https://oxedom.github.io/seed/)**
+
 ![seed initial screen](seed-initial.png)
 
 Type a description, and a configurable LLM (Claude, OpenAI, any OpenAI-compatible endpoint, or Chrome's on-device Gemini Nano) returns raw HTML that replaces the canvas. Generated pages can call `window.regenerate(prompt)` to reproduce themselves. 🪴
