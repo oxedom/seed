@@ -1,9 +1,33 @@
-# seed.
+# 🌱 seed
 
-**seed · a self modifying webpage.**
+**a self-modifying webpage.**
 
-You type a description, a configurable LLM provider (Claude, OpenAI, any OpenAI-compatible endpoint, or Chrome's on-device Gemini Nano) returns raw HTML, and it replaces the canvas. Generated pages can call `window.regenerate(prompt)` to reproduce themselves.
+![seed initial screen](seed-initial.png)
 
-The full state of the page is encoded into the URL: each generated page is gzip-compressed and base64url-encoded into the `?s=` query parameter, so any page can be restored or shared by link alone — no server, no storage. A draggable control panel (regenerate, copy share URL, config, reset) floats above the page and survives every generation.
+Type a description, and a configurable LLM (Claude, OpenAI, any OpenAI-compatible endpoint, or Chrome's on-device Gemini Nano) returns raw HTML that replaces the canvas. Generated pages can call `window.regenerate(prompt)` to reproduce themselves. 🪴
 
-The repository serves `index.html` and deploys it to GitHub Pages via GitHub Actions.
+## how it works
+
+- **URL-encoded state** — the full page is gzip-compressed and base64url-encoded into `?s=`, so any page can be shared or restored by link alone — no server, no storage
+- **Floating control panel** — regenerate, copy share URL, configure, or reset — draggable and survives every generation
+- **Self-modifying** — generated pages can trigger their own regeneration via `window.regenerate(prompt)`
+
+## providers
+
+| Provider | Notes |
+|---|---|
+| Claude | Anthropic API key |
+| OpenAI | OpenAI API key |
+| OpenAI-compatible | Any endpoint (Ollama, Groq, etc.) |
+| Gemini Nano | Chrome's on-device model, no key needed |
+
+## usage
+
+Open [seed on GitHub Pages](https://oxedom.github.io/seed/) or clone and open `index.html` — no build step, no dependencies.
+
+```bash
+git clone https://github.com/oxedom/seed
+open seed/index.html
+```
+
+Enter your API key in the config panel, type a prompt, and watch the page become something new. 🌱
